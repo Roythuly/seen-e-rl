@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "contracts/v0/policy_snapshot.schema.json",
+  "title": "PolicySnapshot",
+  "description": "Placeholder schema for a published policy version.",
+  "type": "object",
+  "x-status": "placeholder",
+  "properties": {
+    "version": {
+      "type": "integer"
+    }
+  }
+}

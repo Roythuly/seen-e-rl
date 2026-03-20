@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "contracts/v0/metric_event.schema.json",
+  "title": "MetricEvent",
+  "description": "Placeholder schema for structured observability events.",
+  "type": "object",
+  "x-status": "placeholder",
+  "properties": {
+    "event_type": {
+      "type": "string"
+    }
+  }
+}

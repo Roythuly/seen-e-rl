@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "contracts/v0/model_spec.schema.json",
+  "title": "ModelSpec",
+  "description": "Placeholder schema for actor critic encoder construction.",
+  "type": "object",
+  "x-status": "placeholder",
+  "properties": {
+    "encoder": {
+      "type": "object"
+    }
+  }
+}

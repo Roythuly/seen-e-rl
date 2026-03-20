@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "contracts/v0/backend_spec.schema.json",
+  "title": "BackendSpec",
+  "description": "Placeholder schema for model backend selection.",
+  "type": "object",
+  "x-status": "placeholder",
+  "properties": {
+    "name": {
+      "type": "string"
+    }
+  }
+}

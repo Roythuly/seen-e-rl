@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "contracts/v0/observation_spec.schema.json",
+  "title": "ObservationSpec",
+  "description": "Placeholder schema for observation modality description.",
+  "type": "object",
+  "x-status": "placeholder",
+  "properties": {
+    "kind": {
+      "type": "string"
+    }
+  }
+}

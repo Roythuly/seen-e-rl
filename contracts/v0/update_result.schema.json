@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "contracts/v0/update_result.schema.json",
+  "title": "UpdateResult",
+  "description": "Placeholder schema for algorithm update outputs.",
+  "type": "object",
+  "x-status": "placeholder",
+  "properties": {
+    "policy_version": {
+      "type": "integer"
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "contracts/v0/trajectory_batch.schema.json",
+  "title": "TrajectoryBatch",
+  "description": "Placeholder schema for on-policy rollout batches.",
+  "type": "object",
+  "x-status": "placeholder",
+  "properties": {
+    "observations": {
+      "type": "object"
+    }
+  }
+}

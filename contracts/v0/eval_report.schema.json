@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "contracts/v0/eval_report.schema.json",
+  "title": "EvalReport",
+  "description": "Placeholder schema for evaluator output artifacts.",
+  "type": "object",
+  "x-status": "placeholder",
+  "properties": {
+    "summary": {
+      "type": "object"
+    }
+  }
+}

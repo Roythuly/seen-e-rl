@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "contracts/v0/checkpoint_manifest.schema.json",
+  "title": "CheckpointManifest",
+  "description": "Placeholder schema for checkpoint metadata and restore hints.",
+  "type": "object",
+  "x-status": "placeholder",
+  "properties": {
+    "path": {
+      "type": "string"
+    }
+  }
+}

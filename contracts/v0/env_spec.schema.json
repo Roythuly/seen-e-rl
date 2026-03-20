@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "contracts/v0/env_spec.schema.json",
+  "title": "EnvSpec",
+  "description": "Placeholder schema for environment identity and adapter hints.",
+  "type": "object",
+  "x-status": "placeholder",
+  "properties": {
+    "id": {
+      "type": "string"
+    }
+  }
+}

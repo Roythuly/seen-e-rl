@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "contracts/v0/replay_record.schema.json",
+  "title": "ReplayRecord",
+  "description": "Placeholder schema for a single off-policy transition.",
+  "type": "object",
+  "x-status": "placeholder",
+  "properties": {
+    "policy_version": {
+      "type": "integer"
+    }
+  }
+}

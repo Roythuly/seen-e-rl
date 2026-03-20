@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "contracts/v0/replay_batch.schema.json",
+  "title": "ReplayBatch",
+  "description": "Placeholder schema for batched replay samples.",
+  "type": "object",
+  "x-status": "placeholder",
+  "properties": {
+    "observations": {
+      "type": "object"
+    }
+  }
+}

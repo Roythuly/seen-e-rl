@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "contracts/v0/observation_batch.schema.json",
+  "title": "ObservationBatch",
+  "description": "Placeholder schema for batched vector, image, or multimodal observations.",
+  "type": "object",
+  "x-status": "placeholder",
+  "properties": {
+    "data": {
+      "type": "object"
+    }
+  }
+}

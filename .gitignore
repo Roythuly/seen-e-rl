@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.pyc
+.venv/
+venv/
+
+# Build and local outputs
+build/
+dist/
+*.egg-info/
+
+# Reports and generated artifacts
+evals/reports/*
+!evals/reports/.gitkeep
+
+# Local environment
+.env
+.DS_Store
+.codex/

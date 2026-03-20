@@ -1,0 +1,11 @@
+name: Evals
+
+on:
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Placeholder
+        run: echo "Evals placeholder for smoke/regression/stability packs"

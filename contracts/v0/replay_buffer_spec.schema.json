@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "contracts/v0/replay_buffer_spec.schema.json",
+  "title": "ReplayBufferSpec",
+  "description": "Placeholder schema for replay buffer capacity and sampling settings.",
+  "type": "object",
+  "x-status": "placeholder",
+  "properties": {
+    "capacity": {
+      "type": "integer"
+    }
+  }
+}
