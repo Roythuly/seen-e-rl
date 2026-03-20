@@ -14,5 +14,5 @@
 
 1. `EnvFactory` 创建环境
 2. `EnvAdapter` 统一 observation / action 语义
-3. `ActorHandle` 给出动作
-4. `TrajectoryAssembler` 产出轨迹或 replay records
+3. `ActorHandle` 给出结构化 `ActionOutput`
+4. `TrajectoryAssembler` / `ReplayAssembler` 产出 rollout 或 transition records

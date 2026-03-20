@@ -2,12 +2,26 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "contracts/v0/model_spec.schema.json",
   "title": "ModelSpec",
-  "description": "Placeholder schema for actor critic encoder construction.",
+  "description": "Minimum contract for actor critic encoder construction and structured training interfaces.",
   "type": "object",
-  "x-status": "placeholder",
+  "x-status": "minimum",
+  "required": ["encoder", "actor_head", "critic_head", "training_interface"],
   "properties": {
     "encoder": {
       "type": "object"
+    },
+    "actor_head": {
+      "type": "object"
+    },
+    "critic_head": {
+      "type": "object"
+    },
+    "feature_sharing": {
+      "type": "object"
+    },
+    "training_interface": {
+      "type": "object"
     }
-  }
+  },
+  "additionalProperties": true
 }

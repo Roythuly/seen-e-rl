@@ -13,5 +13,6 @@
 
 ## 关键约束
 
-- 指标事件必须能表达 algorithm、backend、env、policy_version
+- `MetricEvent` 最少要能表达 `run_id`、`event_type`、`algorithm`、`backend`、`env_id`
+- `MetricEvent` 最少要能表达 `policy_version`、`checkpoint_id`、`env_steps`、`grad_steps`
 - checkpoint 和 evaluation 结果应有统一关联键

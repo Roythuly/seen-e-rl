@@ -7,7 +7,7 @@
 本仓库当前交付 `v0.1` 文档先行版本，重点是把后续实现需要依赖的事实源固定下来：
 
 - 系统与模块架构文档
-- 跨模块 contracts 占位 schema
+- 跨模块 minimum contracts
 - evals/tests/configs/scripts/infra 模板
 - 版本冻结入口与协作模板
 
@@ -15,11 +15,13 @@
 
 ## 系统目标
 
-- 单层策略训练闭环优先
+- 单机研究训练闭环优先
 - 算法中心框架
+- `RuntimeLoop` 统一 on-policy 与 off-policy 的调度语义
 - `sampler` 与 `trainer` 通过 `ReplayBuffer` 和 `PolicySnapshot/ActorHandle` 解耦
-- `PyTorch` 与 `JAX` 双 backend 兼容
-- 同时支持 on-policy 与 off-policy，且将 buffer 设计为未来异步 actor-learner 的桥梁
+- 采样/推理态与训练/恢复态显式区分：`PolicySnapshot` != `CheckpointManifest`
+- `PyTorch` 优先，`JAX` 保留兼容约束
+- `ReplayBuffer` 与 publish schedule 从第一天兼容未来训练/推理节点分离
 - 首批算法文档覆盖 `PPO`、`SAC`、`TD3`
 
 ## 仓库导航
@@ -34,6 +36,7 @@
 
 - 设计先写进 `docs/`，外部讨论只作为输入，不作为事实源
 - 跨模块边界先写进 `contracts/`
+- 顶层实验装配先写进 `configs/`
 - 评测策略先写进 `evals/`
 - 工程门禁尽量以脚本形式固化到 `scripts/`
 

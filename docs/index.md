@@ -13,6 +13,7 @@
 - [architecture/contracts.md](/home/seene/workspace/p2_rl_training/docs/architecture/contracts.md)
 - [architecture/trace-schema.md](/home/seene/workspace/p2_rl_training/docs/architecture/trace-schema.md)
 - [architecture/eval-strategy.md](/home/seene/workspace/p2_rl_training/docs/architecture/eval-strategy.md)
+- [configs/README.md](/home/seene/workspace/p2_rl_training/configs/README.md)
 - [prd/v0.1/system-prd.md](/home/seene/workspace/p2_rl_training/docs/prd/v0.1/system-prd.md)
 - [modules/model/overview.md](/home/seene/workspace/p2_rl_training/docs/modules/model/overview.md)
 - [modules/sampler/overview.md](/home/seene/workspace/p2_rl_training/docs/modules/sampler/overview.md)

@@ -2,12 +2,39 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "contracts/v0/checkpoint_manifest.schema.json",
   "title": "CheckpointManifest",
-  "description": "Placeholder schema for checkpoint metadata and restore hints.",
+  "description": "Minimum contract for a learner checkpoint that can restore training state.",
   "type": "object",
-  "x-status": "placeholder",
+  "x-status": "minimum",
+  "required": ["checkpoint_id", "run_id", "policy_version", "path", "components", "backend", "algorithm", "created_at"],
   "properties": {
+    "checkpoint_id": {
+      "type": "string"
+    },
+    "run_id": {
+      "type": "string"
+    },
+    "policy_version": {
+      "type": "integer"
+    },
     "path": {
       "type": "string"
+    },
+    "components": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["actor", "critic", "target_networks", "optimizers", "entropy_state", "runtime_state"]
+      }
+    },
+    "backend": {
+      "type": "string"
+    },
+    "algorithm": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string"
     }
-  }
+  },
+  "additionalProperties": true
 }

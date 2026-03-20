@@ -2,12 +2,26 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "contracts/v0/env_spec.schema.json",
   "title": "EnvSpec",
-  "description": "Placeholder schema for environment identity and adapter hints.",
+  "description": "Minimum contract for environment identity and adapter hints.",
   "type": "object",
-  "x-status": "placeholder",
+  "x-status": "minimum",
+  "required": ["id"],
   "properties": {
     "id": {
       "type": "string"
+    },
+    "seedable": {
+      "type": "boolean"
+    },
+    "observation_space_ref": {
+      "type": "string"
+    },
+    "action_space_ref": {
+      "type": "string"
+    },
+    "max_episode_steps": {
+      "type": "integer"
     }
-  }
+  },
+  "additionalProperties": true
 }

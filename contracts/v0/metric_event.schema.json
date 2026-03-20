@@ -2,12 +2,66 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "contracts/v0/metric_event.schema.json",
   "title": "MetricEvent",
-  "description": "Placeholder schema for structured observability events.",
+  "description": "Minimum event envelope for structured observability, checkpoint, and evaluation events.",
   "type": "object",
-  "x-status": "placeholder",
+  "x-status": "minimum",
+  "required": [
+    "run_id",
+    "event_type",
+    "event_category",
+    "algorithm",
+    "backend",
+    "env_id",
+    "policy_version",
+    "checkpoint_id",
+    "env_steps",
+    "grad_steps",
+    "timestamp",
+    "status"
+  ],
   "properties": {
+    "run_id": {
+      "type": "string"
+    },
     "event_type": {
       "type": "string"
+    },
+    "event_category": {
+      "type": "string"
+    },
+    "algorithm": {
+      "type": "string"
+    },
+    "backend": {
+      "type": "string"
+    },
+    "env_id": {
+      "type": "string"
+    },
+    "policy_version": {
+      "type": ["integer", "null"]
+    },
+    "checkpoint_id": {
+      "type": ["string", "null"]
+    },
+    "env_steps": {
+      "type": "integer"
+    },
+    "grad_steps": {
+      "type": "integer"
+    },
+    "timestamp": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string"
+    },
+    "metrics": {
+      "type": "object"
+    },
+    "error_code": {
+      "type": ["string", "null"]
     }
-  }
+  },
+  "additionalProperties": true
 }

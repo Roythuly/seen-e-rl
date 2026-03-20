@@ -6,6 +6,7 @@
 - success rate
 - per-seed reward summary
 - checkpoint selection statistics
+- selector 命中分布
 
 ## 事件
 

@@ -2,12 +2,12 @@
 
 ## 定位
 
-`model` 模块负责定义后端无关的 actor/critic/encoder 构建与推理接口，是算法与具体深度学习框架之间的稳定边界。
+`model` 模块负责定义后端无关的 actor/critic/encoder 构建、推理与训练前向接口，是算法与具体深度学习框架之间的稳定边界。
 
 ## 边界
 
 - 输入：`ModelSpec`、`BackendSpec`、`ObservationSpec`
-- 输出：可执行的 policy/value 模型实例
+- 输出：可执行的 actor/value/q 模型实例
 - 不负责：采样调度、训练循环、日志写入
 
 ## 主流程
@@ -18,6 +18,7 @@
 
 ## 设计重点
 
-- 同一份 `ModelSpec` 尽量表达双 backend 共识
+- 同一份 `ModelSpec` 尽量表达双 backend 共识，但当前以 `PyTorch` 为主事实源
 - observation encoder 支持 vector、image、multimodal
 - actor 与 critic 允许共享 encoder，但共享策略必须显式声明
+- 统一 `forward_train(...)`，但通过结构化输出承载 PPO/SAC/TD3 差异

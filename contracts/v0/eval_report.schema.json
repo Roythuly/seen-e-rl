@@ -2,12 +2,48 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "contracts/v0/eval_report.schema.json",
   "title": "EvalReport",
-  "description": "Placeholder schema for evaluator output artifacts.",
+  "description": "Minimum contract for evaluator output artifacts.",
   "type": "object",
-  "x-status": "placeholder",
+  "x-status": "minimum",
+  "required": ["run_id", "checkpoint_id", "policy_version", "selector", "aggregate", "per_seed", "algorithm", "backend", "env_id", "status"],
   "properties": {
-    "summary": {
+    "run_id": {
+      "type": "string"
+    },
+    "checkpoint_id": {
+      "type": "string"
+    },
+    "policy_version": {
+      "type": "integer"
+    },
+    "selector": {
+      "type": "string",
+      "enum": ["latest", "best", "milestone"]
+    },
+    "aggregate": {
       "type": "object"
+    },
+    "per_seed": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "algorithm": {
+      "type": "string"
+    },
+    "backend": {
+      "type": "string"
+    },
+    "env_id": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string"
     }
-  }
+  },
+  "additionalProperties": true
 }

@@ -6,6 +6,7 @@
 
 ## 边界
 
-- 输入：checkpoint / policy snapshot、`EnvSpec`、seed plan
+- 输入：`CheckpointManifest`、`EnvSpec`、seed suite
 - 输出：`EvalReport`
 - 不负责：训练参数更新
+- 评测对象是 checkpoint artifact，不是裸 `policy_version`

@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "contracts/v0/publish_schedule.schema.json",
+  "title": "PublishSchedule",
+  "description": "Minimum contract for deciding when learner state is published as an inference-time policy snapshot.",
+  "type": "object",
+  "x-status": "minimum",
+  "required": ["strategy"],
+  "properties": {
+    "strategy": {
+      "type": "string",
+      "enum": ["after_update", "every_n_updates", "on_actor_update", "manual"]
+    },
+    "every_n_updates": {
+      "type": "integer"
+    },
+    "on_actor_update_only": {
+      "type": "boolean"
+    },
+    "require_checkpoint": {
+      "type": "boolean"
+    }
+  },
+  "additionalProperties": true
+}

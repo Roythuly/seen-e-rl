@@ -16,3 +16,13 @@
 - `SAC/TD3` buffer 与策略刷新节奏
 - 双 backend 接口一致性
 - evaluator 与训练环解耦
+
+## Checkpoint Selector
+
+后续 evaluator 统一围绕 checkpoint artifact 工作，而不是直接围绕裸 `policy_version`。
+
+- `latest`：最新可恢复 learner checkpoint
+- `best`：按主指标排名的 checkpoint
+- `milestone`：按固定训练里程碑保留的 checkpoint
+
+`EvalReport` 必须显式记录 selector、`checkpoint_id`、`policy_version` 与 per-seed 结果。

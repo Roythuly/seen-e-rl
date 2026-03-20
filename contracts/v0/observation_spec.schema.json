@@ -2,12 +2,20 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "contracts/v0/observation_spec.schema.json",
   "title": "ObservationSpec",
-  "description": "Placeholder schema for observation modality description.",
+  "description": "Minimum contract for observation modality and nested key description.",
   "type": "object",
-  "x-status": "placeholder",
+  "x-status": "minimum",
+  "required": ["kind"],
   "properties": {
     "kind": {
       "type": "string"
+    },
+    "layout": {
+      "type": "string"
+    },
+    "fields": {
+      "type": "object"
     }
-  }
+  },
+  "additionalProperties": true
 }

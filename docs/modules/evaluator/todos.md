@@ -1,6 +1,6 @@
 # Evaluator Todos
 
-- 定义 `EvalReport` placeholder schema
-- 说明独立环境重置与 seed suite 语义
-- 明确 best / latest checkpoint 选择策略占位
-- 补充评测结果写回 `info` 的方式
+- 细化 `best` selector 的排名规则
+- 说明 deterministic evaluation 与 stochastic evaluation 的边界
+- 写清评测产物归档目录约定
+- 补充跨 backend 评测一致性注意事项

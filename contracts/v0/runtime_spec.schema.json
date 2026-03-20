@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "contracts/v0/runtime_spec.schema.json",
+  "title": "RuntimeSpec",
+  "description": "Minimum top-level contract for runtime collection, update, publish, checkpoint, and evaluation rules.",
+  "type": "object",
+  "x-status": "minimum",
+  "required": ["collection_schedule", "update_schedule", "publish_schedule"],
+  "properties": {
+    "collection_schedule": {
+      "$ref": "collection_schedule.schema.json"
+    },
+    "update_schedule": {
+      "$ref": "update_schedule.schema.json"
+    },
+    "publish_schedule": {
+      "$ref": "publish_schedule.schema.json"
+    },
+    "checkpoint": {
+      "type": "object"
+    },
+    "evaluation": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": true
+}

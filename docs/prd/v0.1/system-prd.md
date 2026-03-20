@@ -11,7 +11,7 @@
 - 架构设计
 - 模块规范
 - 算法装配文档
-- contracts placeholder schema
+- contracts minimum schema
 - evals/tests/configs/scripts/infra 模板
 - `v0.1` 冻结入口
 
@@ -24,6 +24,6 @@
 
 - AC-001：五个模块的职责边界和 API 语义在文档中明确
 - AC-002：`PPO`、`SAC`、`TD3` 的装配要求有独立文档
-- AC-003：`contracts/v0` 全部 schema 占位齐全且可通过校验脚本
+- AC-003：`contracts/v0` 全部 minimum schema 齐全且可通过校验脚本
 - AC-004：`configs/tests/evals/scripts/infra` 的落点全部存在并有说明
 - AC-005：实现者仅阅读仓库文档即可开始下一轮编码

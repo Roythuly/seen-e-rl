@@ -1,6 +1,6 @@
 # Model Todos
 
-- 定义 `ModelSpec` placeholder schema
-- 写清 `forward_act` 与 `forward_train` 的返回字段
-- 说明 vector/image/multimodal encoder 的最小支持范围
-- 明确 torch/jax checkpoint 恢复约束
+- 细化 `TrainOutputs` 子域里的 shape / dtype 约束
+- 明确 dict observation 下 encoder 组合策略
+- 写清 `Torch` 与 `JAX` 的 capability matrix
+- 增补 action squashing 与 distribution head 的约束

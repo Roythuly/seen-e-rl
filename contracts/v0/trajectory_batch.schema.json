@@ -2,12 +2,50 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "contracts/v0/trajectory_batch.schema.json",
   "title": "TrajectoryBatch",
-  "description": "Placeholder schema for on-policy rollout batches.",
+  "description": "Minimum contract for on-policy rollout batches used by PPO style learners.",
   "type": "object",
-  "x-status": "placeholder",
+  "x-status": "minimum",
+  "required": [
+    "observations",
+    "actions",
+    "rewards",
+    "terminated",
+    "truncated",
+    "log_probs",
+    "value_estimates",
+    "policy_version"
+  ],
   "properties": {
     "observations": {
       "type": "object"
+    },
+    "actions": {
+      "type": "object"
+    },
+    "rewards": {
+      "type": "object"
+    },
+    "terminated": {
+      "type": "object"
+    },
+    "truncated": {
+      "type": "object"
+    },
+    "log_probs": {
+      "type": "object"
+    },
+    "value_estimates": {
+      "type": "object"
+    },
+    "advantages": {
+      "type": "object"
+    },
+    "returns": {
+      "type": "object"
+    },
+    "policy_version": {
+      "type": "integer"
     }
-  }
+  },
+  "additionalProperties": true
 }

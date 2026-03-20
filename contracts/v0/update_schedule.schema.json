@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "contracts/v0/update_schedule.schema.json",
+  "title": "UpdateSchedule",
+  "description": "Minimum contract for deciding when learner updates run and how many updates occur per trigger.",
+  "type": "object",
+  "x-status": "minimum",
+  "required": ["trigger_unit", "updates_per_trigger"],
+  "properties": {
+    "trigger_unit": {
+      "type": "string",
+      "enum": ["env_step", "collection", "episode", "manual"]
+    },
+    "updates_per_trigger": {
+      "type": "integer"
+    },
+    "epochs": {
+      "type": "integer"
+    },
+    "minibatch_size": {
+      "type": "integer"
+    },
+    "min_ready_size": {
+      "type": "integer"
+    },
+    "policy_delay": {
+      "type": "integer"
+    }
+  },
+  "additionalProperties": true
+}

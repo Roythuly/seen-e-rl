@@ -7,6 +7,8 @@
 - buffer fill ratio
 - sample age
 - stale policy ratio
+- actor publish lag
+- checkpoint save latency
 
 ## 事件
 
@@ -15,3 +17,4 @@
 - `buffer_write`
 - `buffer_sample`
 - `policy_published`
+- `checkpoint_saved`

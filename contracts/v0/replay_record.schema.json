@@ -2,12 +2,43 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "contracts/v0/replay_record.schema.json",
   "title": "ReplayRecord",
-  "description": "Placeholder schema for a single off-policy transition.",
+  "description": "Minimum contract for a single off-policy transition.",
   "type": "object",
-  "x-status": "placeholder",
+  "x-status": "minimum",
+  "required": [
+    "observations",
+    "actions",
+    "rewards",
+    "next_observations",
+    "terminated",
+    "truncated",
+    "policy_version"
+  ],
   "properties": {
+    "observations": {
+      "type": "object"
+    },
+    "actions": {
+      "type": "object"
+    },
+    "rewards": {
+      "type": "object"
+    },
+    "next_observations": {
+      "type": "object"
+    },
+    "terminated": {
+      "type": "boolean"
+    },
+    "truncated": {
+      "type": "boolean"
+    },
     "policy_version": {
       "type": "integer"
+    },
+    "env_step": {
+      "type": "integer"
     }
-  }
+  },
+  "additionalProperties": true
 }

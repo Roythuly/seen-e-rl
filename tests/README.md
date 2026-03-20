@@ -1,6 +1,6 @@
 # Tests README
 
-当前阶段测试主要用于校验文档、contracts 占位与工程模板完整性。
+当前阶段测试主要用于校验文档、contracts minimum schema 与工程模板一致性。
 
 后续会扩展为：
 

@@ -1,2 +1,9 @@
 name: torch
-notes: "Future backend selector config goes here."
+runtime_mode: train
+device: cuda:0
+compatibility_tier: primary
+capabilities:
+  - act
+  - train
+  - checkpoint
+notes: "JAX remains a compatible backend target, but Torch is the primary reference backend in v0.1."

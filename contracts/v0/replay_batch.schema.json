@@ -2,12 +2,43 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "contracts/v0/replay_batch.schema.json",
   "title": "ReplayBatch",
-  "description": "Placeholder schema for batched replay samples.",
+  "description": "Minimum contract for batched replay samples used by SAC and TD3 style learners.",
   "type": "object",
-  "x-status": "placeholder",
+  "x-status": "minimum",
+  "required": [
+    "observations",
+    "actions",
+    "rewards",
+    "next_observations",
+    "terminated",
+    "truncated",
+    "policy_version"
+  ],
   "properties": {
     "observations": {
       "type": "object"
+    },
+    "actions": {
+      "type": "object"
+    },
+    "rewards": {
+      "type": "object"
+    },
+    "next_observations": {
+      "type": "object"
+    },
+    "terminated": {
+      "type": "object"
+    },
+    "truncated": {
+      "type": "object"
+    },
+    "policy_version": {
+      "type": ["integer", "object"]
+    },
+    "sample_info": {
+      "type": "object"
     }
-  }
+  },
+  "additionalProperties": true
 }
