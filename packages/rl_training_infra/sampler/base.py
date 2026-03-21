@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from copy import deepcopy
+import inspect
 from typing import Any
 
 
@@ -41,7 +42,26 @@ class EnvAdapter:
     """Small helper that normalizes common env reset/step conventions."""
 
     def reset(self, env: Any, seed: int | None = None) -> tuple[Any, dict[str, Any]]:
-        result = env.reset(seed=seed)
+        reset_fn = env.reset
+        if seed is None:
+            result = reset_fn()
+            return unpack_reset_result(result)
+
+        try:
+            signature = inspect.signature(reset_fn)
+        except (TypeError, ValueError):
+            signature = None
+
+        accepts_seed = False
+        if signature is not None:
+            accepts_seed = "seed" in signature.parameters or any(
+                parameter.kind is inspect.Parameter.VAR_KEYWORD for parameter in signature.parameters.values()
+            )
+
+        if accepts_seed:
+            result = reset_fn(seed=seed)
+        else:
+            result = reset_fn()
         return unpack_reset_result(result)
 
     def step(self, env: Any, action: Any) -> tuple[Any, Any, bool, bool, dict[str, Any]]:
@@ -58,8 +78,8 @@ class BaseCollector(ABC):
         self.adapter = adapter or EnvAdapter()
 
     def collect_step_records(self, amount: int, seed: int | None = None) -> list[dict[str, Any]]:
-        if amount < 0:
-            raise ValueError("amount must be non-negative")
+        if amount <= 0:
+            raise ValueError("amount must be positive")
         observation, _ = self.adapter.reset(self.env, seed=seed)
         records: list[dict[str, Any]] = []
         current_policy_version: int | None = None

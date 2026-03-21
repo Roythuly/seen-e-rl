@@ -1,3 +1,5 @@
+import pytest
+
 from rl_training_infra.sampler.impl.trajectory import TrajectoryCollector
 
 
@@ -41,3 +43,10 @@ def test_trajectory_collector_builds_ppo_style_batch():
     assert batch["log_probs"] == [0.0, -0.5]
     assert batch["value_estimates"] == [0.25, 1.25]
     assert batch["policy_version"] == 7
+
+
+def test_trajectory_collector_rejects_zero_amount():
+    collector = TrajectoryCollector(_FakeTrajectoryEnv(), _FakeTrajectoryActor())
+
+    with pytest.raises(ValueError, match="amount must be positive"):
+        collector.collect(0)

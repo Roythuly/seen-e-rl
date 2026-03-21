@@ -38,7 +38,7 @@ class ReplayCollector(BaseCollector):
             "terminated": terminated,
             "truncated": truncated,
             "policy_version": action_output["policy_version"],
-            "env_step": step_info.get("step", env_step),
+            "env_step": env_step,
         }
 
     def collect(self, amount: int, seed: int | None = None) -> list[dict[str, Any]]:

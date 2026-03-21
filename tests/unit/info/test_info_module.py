@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from importlib import import_module
+from pathlib import Path
+from types import MappingProxyType
 
 from rl_training_infra.info import (
     ConsoleMetricSink,
+    InfoHub,
     InfoHubBase,
     InfoHubTemplate,
     JSONLMetricSink,
@@ -31,6 +33,7 @@ def test_info_package_exports_template_and_base_types() -> None:
     assert InfoHubTemplate.__name__ == "InfoHubTemplate"
     assert MetricSinkTemplate.__name__ == "MetricSinkTemplate"
     assert InfoHubBase.__name__ == "InfoHubBase"
+    assert InfoHub.__name__ == "InfoHub"
     assert MetricEventBuilderBase.__name__ == "MetricEventBuilderBase"
     assert ConsoleMetricSink.__name__ == "ConsoleMetricSink"
     assert JSONLMetricSink.__name__ == "JSONLMetricSink"
@@ -113,6 +116,44 @@ def test_info_hub_ignores_sink_failures_and_keeps_dispatching() -> None:
 
     assert recording_sink.events == [event]
     assert event["status"] == "ok"
+
+
+def test_info_hub_record_normalizes_nested_mappings_for_json_sinks(tmp_path: Path) -> None:
+    hub = InfoHub(
+        builder=MetricEventBuilderBase(
+            run_id="run-1",
+            algorithm="ppo",
+            backend="torch",
+            env_id="CartPole-v1",
+        ),
+        sinks=[JSONLMetricSink(tmp_path / "info.jsonl")],
+    )
+
+    event = hub.record(
+        {
+            "event_type": "update_finished",
+            "event_category": "training",
+            "metrics": MappingProxyType({"loss": 1.25}),
+        }
+    )
+
+    payload = json.loads((tmp_path / "info.jsonl").read_text(encoding="utf-8").strip())
+    assert payload["metrics"] == {"loss": 1.25}
+    assert event["metrics"] == {"loss": 1.25}
+
+
+def test_builder_keeps_reserved_fields_canonical() -> None:
+    builder = MetricEventBuilderBase(
+        run_id="run-1",
+        algorithm="ppo",
+        backend="torch",
+        env_id="CartPole-v1",
+    )
+
+    event = builder.training_event(run_id="override", module="override-module")
+
+    assert event["run_id"] == "run-1"
+    assert event["module"] == "info"
 
 
 def test_console_metric_sink_writes_json_line_to_stdout(capsys) -> None:

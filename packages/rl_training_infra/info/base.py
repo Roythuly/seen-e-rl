@@ -15,6 +15,33 @@ def _as_dict(value: Mapping[str, Any] | None) -> dict[str, Any]:
     return dict(value or {})
 
 
+def _normalize_value(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {key: _normalize_value(item) for key, item in value.items()}
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        return [_normalize_value(item) for item in value]
+    return value
+
+
+RESERVED_EVENT_FIELDS = {
+    "run_id",
+    "event_type",
+    "event_category",
+    "algorithm",
+    "backend",
+    "env_id",
+    "policy_version",
+    "checkpoint_id",
+    "env_steps",
+    "grad_steps",
+    "timestamp",
+    "status",
+    "metrics",
+    "error_code",
+    "module",
+}
+
+
 @dataclass(slots=True)
 class MetricEventBuilderBase:
     run_id: str
@@ -55,11 +82,13 @@ class MetricEventBuilderBase:
             "error_code": error_code,
             "module": self.module,
         }
-        event.update(extra)
+        for key, value in extra.items():
+            if key not in RESERVED_EVENT_FIELDS:
+                event[key] = _normalize_value(value)
         return event
 
     def coerce(self, event: Mapping[str, Any]) -> dict[str, Any]:
-        normalized = dict(event)
+        normalized = {key: _normalize_value(value) for key, value in dict(event).items()}
         normalized.setdefault("run_id", self.run_id)
         normalized.setdefault("algorithm", self.algorithm)
         normalized.setdefault("backend", self.backend)
@@ -70,7 +99,7 @@ class MetricEventBuilderBase:
         normalized.setdefault("grad_steps", 0)
         normalized.setdefault("timestamp", _utc_timestamp())
         normalized.setdefault("status", "ok")
-        normalized.setdefault("metrics", {})
+        normalized["metrics"] = _normalize_value(normalized.get("metrics", {}))
         normalized.setdefault("error_code", None)
         normalized.setdefault("module", self.module)
         return normalized
