@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-pytest tests -q
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest tests -q
