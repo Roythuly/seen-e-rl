@@ -21,6 +21,11 @@ class RecordingSink(MetricSinkTemplate):
         self.events.append(metric_event)
 
 
+class FailingSink(MetricSinkTemplate):
+    def write(self, metric_event: dict[str, object]) -> None:
+        raise RuntimeError("sink unavailable")
+
+
 def test_info_package_exports_template_and_base_types() -> None:
     assert InfoHubTemplate.__name__ == "InfoHubTemplate"
     assert MetricSinkTemplate.__name__ == "MetricSinkTemplate"
@@ -73,6 +78,31 @@ def test_info_hub_records_training_checkpoint_and_evaluation_events() -> None:
     assert evaluation_event["event_category"] == "evaluation"
     assert evaluation_event["checkpoint_id"] == "ckpt-001"
     assert evaluation_event["metrics"] == {}
+
+
+def test_info_hub_ignores_sink_failures_and_keeps_dispatching() -> None:
+    recording_sink = RecordingSink()
+    hub = InfoHubBase(
+        builder=MetricEventBuilderBase(
+            run_id="run-1",
+            algorithm="ppo",
+            backend="torch",
+            env_id="CartPole-v1",
+        ),
+        sinks=[FailingSink(), recording_sink],
+    )
+
+    event = hub.record_training(
+        event_type="update_finished",
+        policy_version=7,
+        env_steps=32,
+        grad_steps=4,
+        metrics={"loss": 1.25},
+        status="ok",
+    )
+
+    assert recording_sink.events == [event]
+    assert event["status"] == "ok"
 
 
 def test_console_metric_sink_writes_json_line_to_stdout(capsys) -> None:

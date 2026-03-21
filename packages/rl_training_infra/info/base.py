@@ -168,7 +168,10 @@ class InfoHubBase(InfoHubTemplate):
     def record(self, event: Mapping[str, Any]) -> dict[str, Any]:
         normalized = self.builder.coerce(event)
         for sink in self.sinks:
-            sink.write(normalized)
+            try:
+                sink.write(normalized)
+            except Exception:
+                continue
         return normalized
 
     def record_training(self, **event: Any) -> dict[str, Any]:
