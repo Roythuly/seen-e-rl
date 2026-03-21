@@ -10,12 +10,17 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
   "jsonschema>=4.0",
+  "numpy>=1.26",
   "PyYAML>=6.0",
+  "torch>=2.1",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
 
+[tool.setuptools.packages.find]
+where = ["packages"]
+
 [tool.pytest.ini_options]
-pythonpath = ["."]
+pythonpath = [".", "packages"]
 testpaths = ["tests"]
