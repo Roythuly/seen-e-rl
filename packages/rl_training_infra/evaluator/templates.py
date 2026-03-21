@@ -14,3 +14,9 @@ class EvaluatorTemplate(ABC):
     @abstractmethod
     def evaluate(self, checkpoint_manifest: dict[str, Any], seeds: list[int], env_spec: dict[str, Any]) -> dict[str, Any]:
         raise NotImplementedError
+
+
+class EvalReportWriterTemplate(ABC):
+    @abstractmethod
+    def write(self, report: dict[str, Any]) -> dict[str, Any]:
+        raise NotImplementedError
