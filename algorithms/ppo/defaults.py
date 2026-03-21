@@ -1,0 +1,33 @@
+from __future__ import annotations
+
+from typing import Any
+
+
+def build_default_ppo_experiment() -> dict[str, Any]:
+    return {
+        "run_name": "ppo-humanoid-v5",
+        "seed": 1,
+        "backend": {"name": "torch", "runtime_mode": "train", "device": "cpu"},
+        "env": {"id": "Humanoid-v5"},
+        "model": {
+            "encoder": {"kind": "mlp", "input_dim": 348, "hidden_sizes": [256, 256]},
+            "actor_head": {"kind": "gaussian_policy", "action_dim": 17},
+            "critic_head": {"kind": "value_head"},
+        },
+        "algo": {"name": "ppo"},
+        "sampler": {"mode": "trajectory", "collection": {"unit": "env_step", "amount": 2048}},
+        "trainer": {
+            "runtime": {
+                "collection_schedule": {
+                    "mode": "rollout",
+                    "unit": "env_step",
+                    "amount": 2048,
+                    "freeze_policy_during_collection": True,
+                },
+                "update_schedule": {"trigger_unit": "collection", "updates_per_trigger": 1, "epochs": 10, "minibatch_size": 256},
+                "publish_schedule": {"strategy": "after_update"},
+            }
+        },
+        "buffer": {"capacity": 2048, "batch_size": 256, "min_ready_size": 2048, "sampling_mode": "fifo"},
+        "eval": {"selector": "latest", "seeds": [1, 2, 3], "episodes_per_seed": 2},
+    }
