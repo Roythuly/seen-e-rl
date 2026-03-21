@@ -1,4 +1,5 @@
 import torch
+import pytest
 
 from rl_training_infra.model import (
     DeterministicActor,
@@ -105,6 +106,7 @@ def test_torch_sac_model_returns_policy_q_and_alpha_outputs():
     assert train_outputs["q"]["online"]["q2"].shape == (5,)
     assert train_outputs["q"]["target"]["q1"].shape == (5,)
     assert train_outputs["q"]["target"]["q2"].shape == (5,)
+    assert train_outputs["target"]["next_action_log_prob"].shape == (5,)
     assert torch.isclose(train_outputs["aux"]["alpha"], torch.tensor(0.2))
 
 
@@ -138,3 +140,15 @@ def test_torch_td3_model_returns_policy_online_q_and_target_smoothing_outputs():
     assert train_outputs["q"]["target"]["q1"].shape == (5,)
     assert train_outputs["q"]["target"]["q2"].shape == (5,)
     assert train_outputs["aux"]["target_policy_smoothing"]["smoothed_actions"].shape == (5, 2)
+
+
+def test_torch_model_requires_explicit_observation_keys() -> None:
+    model = TorchPPOModel(
+        encoder=MLPEncoder(input_dim=2, hidden_sizes=[4]),
+        actor=GaussianActor(input_dim=4, action_dim=2),
+        value_head=ValueHead(input_dim=4),
+        policy_version=1,
+    )
+
+    with pytest.raises(KeyError, match="observations"):
+        model.forward_act({"actions": torch.randn(3, 2)})

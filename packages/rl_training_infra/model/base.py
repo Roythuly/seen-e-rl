@@ -50,12 +50,7 @@ def batch_tensor_from_dict(batch: dict[str, Any], *preferred_keys: str) -> Tenso
         if isinstance(value, Tensor):
             return ensure_2d_float_tensor(value)
 
-    tensor_values = [ensure_2d_float_tensor(value) for value in batch.values() if isinstance(value, Tensor)]
-    if not tensor_values:
-        raise KeyError(f"Expected tensor payload under one of {preferred_keys or ('<any tensor field>',)}")
-    if len(tensor_values) == 1:
-        return tensor_values[0]
-    return torch.cat(tensor_values, dim=-1)
+    raise KeyError(f"Expected tensor payload under one of {preferred_keys or ('<any tensor field>',)}")
 
 
 class TorchModelTemplateBase(ModelTemplate, nn.Module):

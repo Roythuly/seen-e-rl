@@ -88,7 +88,10 @@ class TorchSACModel(TorchModelTemplateBase):
             "policy": {"distribution_params": distribution_params},
             "value": {},
             "q": {"online": online_q, "target": target_q},
-            "target": {},
+            "target": {
+                "next_actions": target_policy["action"],
+                "next_action_log_prob": target_policy["log_prob"],
+            },
             "aux": {"alpha": self._alpha.clone()},
         }
 
