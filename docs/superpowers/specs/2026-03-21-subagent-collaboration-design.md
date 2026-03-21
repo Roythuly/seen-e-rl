@@ -64,9 +64,16 @@
 
 每个实例只负责：
 
-- 本模块的文档、contracts、configs、tests、实现代码
-- 本模块对外暴露的 contract / interface 定义
+- 本模块私有或模块级文档、configs、tests、实现代码
+- 本模块 module-scoped public interface 定义
 - 本模块内部验证
+
+如果任务卡显式授权，`module-dev` 也可以修改少量 shared surface，但只能在以下前提下进行：
+
+- `dispatcher` 已为该任务预留独占路径
+- 变更直接服务于该模块任务
+- 共享 contract 仍遵守 add-only 与 RFC-first 规则
+- 最终合并仍由 `dispatcher` 和 `integrator` 收口
 
 每个实例不负责：
 
@@ -75,7 +82,7 @@
 - 跨模块回归收口
 - 系统级 CI 设计
 
-默认规则：`module-dev` 可以修改“本模块实现 + 本模块对外 contract/interface 定义”，但不能把下游适配与装配收口也揽到自己身上。
+默认规则：`module-dev` 可以修改“本模块实现 + 本模块 module-scoped interface 定义”，也可以在明确授权时提出 shared contract 变更，但不能把下游适配与装配收口也揽到自己身上，更不能绕过现有 contract 治理规则单独落地破坏性变更。
 
 #### `integrator`
 
@@ -103,27 +110,55 @@
 
 ### 2. Task Decomposition Model
 
-本设计固定按模块拆任务，而不是按临时能力切片拆分。原因如下：
+本设计以模块任务为主，而不是按临时能力切片全面改写拆分逻辑。原因如下：
 
 - 当前仓库的事实源已经按五模块组织
 - docs-first 阶段与实现阶段都可以沿用相同边界
 - 模块 owner 最容易对本模块 contract 负责
 - `integrator` 可以专门消化跨模块 wiring，而不污染模块职责
 
+但当前仓库也存在一类天然不是模块私有的 shared surface，例如：
+
+- `contracts/v0/*`
+- `docs/architecture/*`
+- `docs/index.md` 与 release / navigation 入口
+- `configs/experiment/*`
+- `scripts/validate_*.py`
+- `tests/contract/*`
+- `tests/integration/*`
+- `.github/workflows/*`
+
+因此，`dispatcher` 实际上要管理两类任务：
+
+1. 模块任务：默认单位，绑定到单个模块
+2. shared-surface task：仍以某个 lead module 或 `integrator` 为责任主体，但必须串行处理共享路径
+
 跨模块能力如 `RuntimeLoop`、`ReplayBuffer`、`PolicySnapshot publish`、`CheckpointManifest` 虽然天然横跨多个模块，但默认处理方式不是新建“能力型 module-dev”，而是：
 
 1. 由 `dispatcher` 将相关工作拆到对应模块任务卡中
-2. 每个模块 owner 只修改自己拥有的边界
-3. 由 `integrator` 负责最终跨模块接线与收口
+2. 若任务触及 shared surface，则在任务卡中显式列出“borrowed shared ownership”
+3. `dispatcher` 保证共享路径同一时刻只被一个任务持有
+4. 由 `integrator` 负责最终跨模块接线与收口
+
+这里需要额外区分两类 shared surface：
+
+- shared contract / architecture surface
+  - 可由 lead `module-dev` 在明确授权下修改
+  - 仍受 repo 级 contract 治理约束
+- assembly / validation surface
+  - 默认归 `integrator` 所有
+  - 包括 `configs/experiment/*`、`.github/workflows/*`、`tests/contract/*`、`tests/integration/*`、顶层入口 wiring
+
+这样既保留“模块优先”的主路径，也给 docs-first 阶段大量共享文件留出明确 owner。
 
 ### 3. Branching And Worktree Strategy
 
 默认并发策略采用独立 worktree，而不是共享工作区。
 
-建议保留两个长期语义分支或工作区视角：
+本设计将 `integration/mainline` 定义为真实长期分支，并建议配套一个长期 integration worktree。建议保留两个长期语义分支或工作区视角：
 
 - `main`：人类可读、相对稳定
-- `integration/mainline`：持续汇总各模块结果，允许短期演进，但必须保持可冒烟验证
+- `integration/mainline`：持续汇总各模块结果，允许短期演进，但必须保持当前阶段对应的门禁可通过
 
 每个模块任务都从当前 `integration/mainline` 派生独立 worktree，例如：
 
@@ -137,23 +172,31 @@
 - `integrator` 每次都围绕最新 integration 基线收口
 - 合并失败和回归问题更容易定位到具体模块任务
 
+但 worktree 只隔离工作区，不自动消除 shared surface 冲突。因此并发必须附带路径级串行规则：
+
+- 只有当任务卡的 writable paths 与 reserved shared paths 互不重叠时，多个 `module-dev` 才允许并发
+- 任何触及 `contracts/v0/*`、`docs/architecture/*`、`docs/index.md`、`configs/experiment/*`、`scripts/validate_*.py`、`tests/contract/*`、`tests/integration/*`、`.github/workflows/*` 的任务，都必须由 `dispatcher` 显式加锁
+- 默认由 `integrator` 持有 assembly / validation surface；模块任务只有在被授权时才能临时借用
+
 ### 4. Task Lifecycle
 
 每个任务都遵循固定状态机：
 
-`Planned -> Module In Progress -> Awaiting Integration -> Integrated -> Review Pending -> Done`
+`Planned -> Owner In Progress -> Awaiting Integration -> Integrated -> Review Pending -> Done`
 
 具体流转如下：
 
-1. `dispatcher` 根据用户目标创建模块任务卡
-2. 从 `integration/mainline` 创建模块 worktree 和分支
-3. spawn 一个 `module-dev` 实例执行该任务
-4. `module-dev` 完成后，提交显式 handoff，状态进入 `Awaiting Integration`
-5. `dispatcher` 将结果回收到 integration 基线，并立即唤起 `integrator`
-6. `integrator` 完成接线、冒烟验证和 CI 更新后，状态进入 `Integrated`
-7. 在阶段里程碑或最终收尾时，`dispatcher` 唤起 `reviewer`
-8. 若审查通过，进入 `Done`
-9. 若审查或集成失败，则按归属回流为新的模块任务或集成任务
+1. `dispatcher` 根据用户目标创建任务卡，并指定 `Execution Owner`
+2. 从 `integration/mainline` 创建对应 worktree 和分支
+3. 若 `Execution Owner = module-dev`，则 spawn 一个 `module-dev` 实例执行该任务
+4. 若 `Execution Owner = integrator`，则直接 spawn `integrator` 执行 shared-surface task
+5. `module-dev` 完成后，提交显式 handoff，状态进入 `Awaiting Integration`
+6. `dispatcher` 将模块结果回收到 integration 基线，并立即唤起 `integrator`
+7. `integrator` 完成接线、shared surface 收口、冒烟验证和 CI 更新后，状态进入 `Integrated`
+8. 对于直接由 `integrator` 执行的 shared-surface task，可跳过单独的 `Awaiting Integration`，但仍需输出 completion note 和验证结果
+9. 在阶段里程碑或最终收尾时，`dispatcher` 唤起 `reviewer`
+10. 若审查通过，进入 `Done`
+11. 若审查或集成失败，则按归属回流为新的模块任务或集成任务
 
 ### 5. Dispatcher Playbook
 
@@ -178,10 +221,15 @@
 
 ```text
 Task: <short title>
+Task Type: <module|shared-surface>
+Execution Owner: <module-dev|integrator>
 Module: <model|sampler|trainer|info|evaluator>
+Phase: <docs-first|implementation>
 Goal: <what changes by the end>
 Writable Paths:
 - <owned paths>
+Reserved Shared Paths:
+- <exclusive shared paths or "none">
 Allowed Interface Surface:
 - <owned contracts / public interfaces>
 Out Of Scope:
@@ -207,6 +255,9 @@ Completed:
 Files Changed:
 - <path list>
 
+Shared Surfaces Touched:
+- <shared paths or "none">
+
 Interface Changes:
 - <contracts / public APIs changed or "none">
 
@@ -224,18 +275,40 @@ Open Risks:
 
 ### 8. Verification Gates
 
-#### `module-dev` gate
+所有 gate 都必须 phase-aware。当前仓库仍是 docs-first，所以流程不能强迫 agent 为了“满足 gate”去伪造运行态 wiring、假烟雾测试或无意义 CI 复杂度。
 
-`module-dev` 只能证明“本模块成立”，其完成门禁包括：
+#### 当前 docs-first gate
+
+当前阶段的“integration”应解释为文档、contracts、configs、validation scripts、tests 模板与 CI 模板之间的一致性，而不是可运行训练主程序。
+
+`module-dev` gate：
+
+- 若任务只触及模块文档 / configs / templates，至少运行 `python scripts/validate_docs.py`
+- 若任务触及 `contracts/v0/*`，额外运行 `python scripts/validate_contracts.py`
+- 若任务触及 `tests/*`、`scripts/validate_*.py` 或会影响仓库校验行为，额外运行 `bash scripts/run_tests.sh`
+- 当前阶段的完成表述应为“文档 / contract / config / template 一致”；只有在实现文件真实存在时，才要求“实现一致”
+
+`integrator` gate：
+
+- 在 docs-first 阶段，`integrator` 的首要职责是收口 shared config、shared docs、validation scripts、CI 模板和跨模块引用
+- 必跑命令为 `python scripts/validate_docs.py`
+- 若本轮触及 contracts，则必跑 `python scripts/validate_contracts.py`
+- 必跑 `bash scripts/run_tests.sh`
+- CI 更新必须与当前门禁对齐，重点是 docs / contracts / tests validation，而不是假设已经有运行态训练链路
+- 若本轮触及 `.github/workflows/*`、`tests/contract/*` 或 `tests/integration/*` 这类尚未被现有脚本完整覆盖的 surface，则该任务必须同时新增或更新可执行校验，使其进入 `bash scripts/run_tests.sh`、`python scripts/validate_docs.py` 或其他写入任务卡的自动化命令；在此之前不应把这类改动视为 fully gated
+
+#### 后续实现阶段 gate
+
+当 `packages/`、`algorithms/` 或真实 runtime 入口开始落地后，再追加实现期 gate。
+
+`module-dev` 只能证明“本模块成立”，其实现期完成门禁包括：
 
 - 本模块文档、contracts、实现一致
 - 本模块最小测试或校验通过
 - 对外接口变更被显式列出
 - 已知风险没有被隐藏
 
-#### `integrator` gate
-
-`integrator` 需要证明“链路接通”，其完成门禁包括：
+`integrator` 的实现期完成门禁包括：
 
 - 入口装配和 wiring 完成
 - shared config 已同步
@@ -325,7 +398,8 @@ your-repo/
 
 本设计不直接引入新的训练 runtime contract，但会引入以下协作协议层面的稳定约束：
 
-- “模块 owner 拥有本模块对外接口定义权”
+- “模块 owner 拥有本模块 module-scoped interface 定义权”
+- “shared contracts 仍是 repo 级治理对象，遵守 add-only / RFC-first”
 - “consumer 适配权属于 `integrator`”
 - “审查结论与修复职责分离”
 - “任务卡与 handoff 为硬性交付物”
@@ -341,7 +415,7 @@ your-repo/
 - 后续 `algorithms/` 算法实现
 - `tests/` 中从 contract 校验扩展到 unit / integration 的演进路径
 
-在 docs-first 阶段，`module-dev` 的产物主要表现为文档、contracts、configs、tests 模板；在实现阶段，则自然扩展为模块代码和模块级测试。角色模型不需要切换。
+在 docs-first 阶段，`module-dev` 的产物主要表现为文档、contracts、configs、tests 模板；此时 `integrator` 收口的是 shared docs、shared configs、validation scripts、CI 模板和跨模块引用。在实现阶段，则自然扩展为模块代码、模块级测试和真实入口 wiring。角色模型不需要切换，但 gate 会升级。
 
 ## Rollout / Migration
 
@@ -401,6 +475,4 @@ your-repo/
 
 ## Open Questions
 
-- `integration/mainline` 是采用真实长期分支，还是只保留为约定性的 worktree 视角
 - `module-dev` 是否需要为不同模块设定不同的默认验证命令
-- 初版是否需要额外定义“spec-only module-dev” profile，还是直接复用同一角色
