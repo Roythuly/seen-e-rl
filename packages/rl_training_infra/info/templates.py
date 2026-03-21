@@ -10,6 +10,18 @@ class MetricSinkTemplate(ABC):
         raise NotImplementedError
 
 
+class HealthSinkTemplate(MetricSinkTemplate):
+    @abstractmethod
+    def write(self, health_event: dict[str, Any]) -> None:
+        raise NotImplementedError
+
+
+class CheckpointSinkTemplate(MetricSinkTemplate):
+    @abstractmethod
+    def write(self, checkpoint_event: dict[str, Any]) -> None:
+        raise NotImplementedError
+
+
 class InfoHubTemplate(ABC):
     @abstractmethod
     def record(self, event: dict[str, Any]) -> None:

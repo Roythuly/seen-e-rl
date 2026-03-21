@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from importlib import import_module
 
 from rl_training_infra.info import (
     ConsoleMetricSink,
@@ -33,6 +34,15 @@ def test_info_package_exports_template_and_base_types() -> None:
     assert MetricEventBuilderBase.__name__ == "MetricEventBuilderBase"
     assert ConsoleMetricSink.__name__ == "ConsoleMetricSink"
     assert JSONLMetricSink.__name__ == "JSONLMetricSink"
+
+
+def test_info_package_exports_health_and_checkpoint_sink_templates() -> None:
+    info_module = import_module("rl_training_infra.info")
+
+    assert hasattr(info_module, "HealthSinkTemplate")
+    assert hasattr(info_module, "CheckpointSinkTemplate")
+    assert info_module.HealthSinkTemplate.__name__ == "HealthSinkTemplate"
+    assert info_module.CheckpointSinkTemplate.__name__ == "CheckpointSinkTemplate"
 
 
 def test_info_hub_records_training_checkpoint_and_evaluation_events() -> None:
