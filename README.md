@@ -66,24 +66,42 @@ uv run render/renderer.py --config configs/sac.yaml --checkpoint results/xxx/che
 
 ## Project Structure
 
-```
+```text
 seen-e-rl/
-├── configs/                  # YAML configurations (default, sac, td3, ppo)
-├── seenerl/                  # Main package
-│   ├── algorithms/           # SAC, TD3, PPO implementations
-│   ├── networks/             # MLP, registry (extensible)
-│   ├── buffers/              # ReplayBuffer, RolloutBuffer
-│   ├── trainers/             # Off-policy, On-policy trainers
-│   ├── evaluator.py          # Standalone robust evaluator
-│   ├── checkpoint.py         # Multi-strategy checkpoint manager
-│   ├── logger.py             # TensorBoard + wandb logging
-│   ├── config.py             # YAML loader
-│   └── utils.py              # Common utilities
-├── render/                   # Rendering submodule
-├── tests/                    # Smoke tests
-├── train.py                  # Training entry point
-├── evaluate.py               # Evaluation entry point
-└── pyproject.toml            # Project metadata
+├── configs/                  # YAML configurations (hyperparameters)
+│   ├── default.yaml          # Shared base defaults for all algorithms
+│   ├── sac.yaml              # Config overrides specific to SAC
+│   ├── td3.yaml              # Config overrides specific to TD3
+│   ├── ppo.yaml              # Config overrides specific to PPO
+│   └── obac.yaml             # Config overrides specific to OBAC
+├── seenerl/                  # Core library and logic package
+│   ├── algorithms/           # Implementations of RL algorithms
+│   │   ├── base.py           # Base algorithm interface class
+│   │   ├── obac.py           # Offline-Boosted Actor-Critic implementation    
+│   │   ├── ppo.py            # Proximal Policy Optimization implementation
+│   │   ├── sac.py            # Soft Actor-Critic implementation
+│   │   └── td3.py            # Twin Delayed DDPG implementation
+│   ├── networks/             # Neural network definitions and modules
+│   │   ├── base.py           # Abstract BaseActor and BaseCritic
+│   │   ├── mlp.py            # GaussianActor, DeterministicActor, and MLP Critics
+│   │   └── registry.py       # Centralized registry for dynamic network loads
+│   ├── buffers/              # Memory storage for transitions and rollouts
+│   │   ├── replay_buffer.py  # Standard O(1) buffer for off-policy algorithms
+│   │   └── rollout_buffer.py # Standard batching buffer for on-policy algorithms
+│   ├── trainers/             # Training loop logic
+│   │   ├── off_policy.py     # Single-env training loop for SAC/TD3/OBAC
+│   │   └── on_policy.py      # Batch-gathering training loop for PPO
+│   ├── evaluator.py          # Standalone robust action bounds evaluator
+│   ├── checkpoint.py         # Multi-strategy checkpoint saving and restoring manager
+│   ├── logger.py             # Handles writing to TensorBoard and Weights & Biases
+│   ├── config.py             # Safe YAML config loading and CLI argument overriding
+│   └── utils.py              # Assorted math, seeds, and device utilities
+├── render/                   # Scripts and utilities to easily visualize models
+│   └── renderer.py           # Evaluates algorithm with gymnasium's render_mode="human"
+├── tests/                    # Minimal environment testing and code smoke tests
+├── train.py                  # Main training entry point
+├── evaluate.py               # Main evaluating entry point without rendering
+└── pyproject.toml            # Project packaging metadata and pip dependencies
 ```
 
 ## Configuration
@@ -100,18 +118,6 @@ automatic_entropy_tuning: false
 
 Override any parameter via CLI dynamically: `--key value` or `--nested.key value`.
 
-## Citation
-
-If you use OBAC in your evaluations, please cite the following paper:
-
-```latex
-@inproceedings{Luo2024obac,
-  title={Offline-Boosted Actor-Critic: Adaptively Blending Optimal Historical Behaviors in Deep Off-Policy RL}, 
-  author={Yu Luo and Tianjing Ji and Fuchun Sun and Jianwei Zhang and Huazhe Xu and Xianyuan Zhan},
-  booktitle={International Conference on Machine Learning},
-  year={2024}
-}
-```
 
 ## License
 
