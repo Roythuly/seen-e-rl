@@ -1,5 +1,0 @@
-capacity: 1000000
-batch_size: 256
-min_ready_size: 1000
-sampling_mode: random
-notes: "PPO may keep the section present in experiment config but does not need replay sampling during rollout updates."

@@ -1,4 +1,0 @@
-name: sac
-family: off_policy
-train_interface: learner.update
-notes: "PPO switches sampler.mode to trajectory and uses rollout-style collection/update schedules."

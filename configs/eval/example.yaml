@@ -1,5 +1,0 @@
-selector: latest
-seeds: [1, 2, 3, 4, 5]
-episodes_per_seed: 5
-run_on_milestone_only: false
-notes: "Evaluator works on checkpoint artifacts and records per-seed summaries."

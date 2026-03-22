@@ -1,3 +1,0 @@
-cases:
-  - id: smoke-docs-bootstrap
-    goal: ensure repository documentation and contracts placeholders exist

@@ -1,7 +1,0 @@
-mode: replay
-num_envs: 1
-collection:
-  unit: env_step
-  amount: 1
-  freeze_policy_during_collection: false
-notes: "PPO switches mode to trajectory and enables policy freeze during collection."

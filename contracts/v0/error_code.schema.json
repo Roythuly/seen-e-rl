@@ -1,8 +1,0 @@
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "contracts/v0/error_code.schema.json",
-  "title": "ErrorCode",
-  "description": "Minimum contract for standardized error identifiers.",
-  "type": "string",
-  "x-status": "minimum"
-}

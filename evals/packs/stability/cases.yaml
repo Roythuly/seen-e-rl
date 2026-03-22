@@ -1,3 +1,0 @@
-cases:
-  - id: stability-placeholder
-    goal: future NaN, seed, buffer starvation, and stale policy checks go here

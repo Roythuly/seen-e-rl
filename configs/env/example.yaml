@@ -1,6 +1,0 @@
-id: Pendulum-v1
-seedable: true
-observation_space_ref: gymnasium://Pendulum-v1/observation
-action_space_ref: gymnasium://Pendulum-v1/action
-max_episode_steps: 200
-notes: "Use EnvAdapter when raw env semantics need normalization."

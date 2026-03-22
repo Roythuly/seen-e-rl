@@ -1,4 +1,0 @@
-services:
-  placeholder:
-    image: alpine:3.20
-    command: ["sh", "-c", "echo 'docker-compose placeholder for future local infra'"]
