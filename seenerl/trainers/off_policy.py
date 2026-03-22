@@ -1,60 +1,36 @@
-"""
-Off-policy trainer for SAC and TD3.
-
-Training loop:
-  1. Interact with environment step-by-step
-  2. Store transitions in ReplayBuffer
-  3. When buffer is large enough, sample and update networks
-  4. Periodically evaluate and save checkpoints
-"""
+"""Batched off-policy trainer for SAC, TD3, and OBAC."""
 
 import datetime
-import itertools
 import os
 
-import gymnasium as gym
 import numpy as np
 
-from seenerl.algorithms.base import BaseAlgorithm
+from seenerl.algorithms import build_algorithm
 from seenerl.buffers.replay_buffer import ReplayBuffer
 from seenerl.checkpoint import CheckpointManager
 from seenerl.config import Config
+from seenerl.envs import create_env
 from seenerl.evaluator import Evaluator
 from seenerl.logger import TrainingLogger
-from seenerl.utils import set_seed, resolve_device
+from seenerl.utils import (
+    resolve_buffer_next_states,
+    sample_batched_actions,
+    set_seed,
+)
 
 
 class OffPolicyTrainer:
-    """
-    Off-policy training loop for SAC / TD3.
-
-    Handles: environment interaction, buffer management, network updates,
-    evaluation, checkpointing, and logging.
-    """
+    """Off-policy training loop for batched Gymnasium / Isaac Lab envs."""
 
     def __init__(self, config: Config):
         self.config = config
-
-        # Seed
         set_seed(config.seed)
 
-        # Environment
-        self.env = gym.make(config.env_name)
+        self.env = create_env(config)
         obs_dim = self.env.observation_space.shape[0]
         action_dim = self.env.action_space.shape[0]
 
-        # Agent
-        algo_name = config.algo.upper()
-        if algo_name == "SAC":
-            from seenerl.algorithms.sac import SAC
-            self.agent = SAC(obs_dim, self.env.action_space, config)
-        elif algo_name == "TD3":
-            from seenerl.algorithms.td3 import TD3
-            self.agent = TD3(obs_dim, self.env.action_space, config)
-        else:
-            raise ValueError(f"Unknown off-policy algorithm: {config.algo}")
-
-        # Buffer
+        self.agent = build_algorithm(config, self.env.observation_space, self.env.action_space)
         self.memory = ReplayBuffer(
             capacity=config.replay_size,
             obs_dim=obs_dim,
@@ -62,17 +38,16 @@ class OffPolicyTrainer:
             seed=config.seed,
         )
 
-        # Result directory
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        env_id = config.env.id
         self.result_dir = os.path.join(
             config.checkpoint.get("save_dir", "results"),
-            config.env_name,
+            env_id,
             config.algo,
             config.tag,
             f"{timestamp}_seed{config.seed}",
         )
 
-        # Logger
         logger_cfg = config.get("logger", {})
         self.logger = TrainingLogger(
             log_dir=self.result_dir,
@@ -81,14 +56,12 @@ class OffPolicyTrainer:
             use_wandb=logger_cfg.get("use_wandb", False),
             wandb_project=logger_cfg.get("wandb_project", "seen-e-rl"),
             wandb_entity=logger_cfg.get("wandb_entity", None),
-            wandb_name=f"{config.algo}_{config.env_name}_{timestamp}",
+            wandb_name=f"{config.algo}_{env_id}_{timestamp}",
         )
 
-        # Evaluator
-        eval_env = gym.make(config.env_name)
+        eval_env = create_env(config, num_envs=1)
         self.evaluator = Evaluator(eval_env, self.agent, self.logger)
 
-        # Checkpoint manager
         ckpt_cfg = config.get("checkpoint", {})
         self.ckpt_manager = CheckpointManager(
             save_dir=os.path.join(self.result_dir, "checkpoints"),
@@ -98,21 +71,19 @@ class OffPolicyTrainer:
             save_buffer=ckpt_cfg.get("save_buffer", True),
         )
 
-        # Training state
         self.total_steps = 0
         self.updates = 0
         self.best_reward = -float("inf")
+        self.completed_episodes = 0
 
-        # Resume if specified
         if config.get("resume"):
             self._resume(config.resume)
 
     def _resume(self, checkpoint_path: str) -> None:
         """Resume training from a checkpoint."""
-        state = CheckpointManager.load(
-            checkpoint_path, self.agent, self.memory
-        )
+        state = CheckpointManager.load(checkpoint_path, self.agent, self.memory)
         self.total_steps = state["step"]
+        self.completed_episodes = state["epoch"]
         self.best_reward = state["best_reward"]
         self.ckpt_manager.best_reward = self.best_reward
         self.logger.log_info(
@@ -120,74 +91,86 @@ class OffPolicyTrainer:
             f"best_reward={self.best_reward:.2f}"
         )
 
-    def train(self) -> None:
-        """Main training loop."""
-        self.logger.log_info(
-            f"Starting {self.config.algo} training on {self.config.env_name} "
-            f"(device: {self.agent.device})"
+    def _maybe_evaluate(self) -> None:
+        if not self.config.eval:
+            return
+        if self.completed_episodes == 0:
+            return
+        if self.completed_episodes % self.config.eval_interval != 0:
+            return
+
+        result = self.evaluator.evaluate(
+            num_episodes=self.config.eval_episodes,
+            step=self.total_steps,
+        )
+        self.ckpt_manager.save_if_needed(
+            agent=self.agent,
+            step=self.total_steps,
+            epoch=self.completed_episodes,
+            eval_reward=result["avg_reward"],
+            buffer=self.memory,
         )
 
-        for i_episode in itertools.count(1):
-            episode_reward = 0.0
-            episode_steps = 0
-            done = False
-            truncated = False
-            state, _ = self.env.reset(seed=self.config.seed + i_episode)
+    def train(self) -> None:
+        """Main off-policy training loop."""
+        num_envs = self.env.num_envs
+        episode_rewards = np.zeros(num_envs, dtype=np.float32)
+        episode_steps = np.zeros(num_envs, dtype=np.int64)
+        state, _ = self.env.reset(seed=self.config.seed)
 
-            while not (done or truncated):
-                # Action selection
-                if self.total_steps < self.config.start_steps:
-                    action = self.env.action_space.sample()
-                else:
-                    action = self.agent.select_action(state)
+        self.logger.log_info(
+            f"Starting {self.config.algo} training on {self.config.env.id} "
+            f"(num_envs={num_envs}, device: {self.agent.device})"
+        )
 
-                # Environment step
-                next_state, reward, done, truncated, info = self.env.step(action)
-                episode_steps += 1
-                self.total_steps += 1
-                episode_reward += reward
+        while self.total_steps < self.config.num_steps:
+            if self.total_steps < self.config.start_steps:
+                action = sample_batched_actions(self.env.action_space, num_envs)
+            else:
+                action = self.agent.select_action(state)
 
-                # Done masking (ignore timeout signal)
-                mask = 0.0 if done and not truncated else 1.0
+            next_state, reward, terminated, truncated, info = self.env.step(action)
+            reward = np.asarray(reward, dtype=np.float32).reshape(num_envs)
+            terminated = np.asarray(terminated, dtype=np.bool_).reshape(num_envs)
+            truncated = np.asarray(truncated, dtype=np.bool_).reshape(num_envs)
+            done = terminated | truncated
 
-                self.memory.push(state, action, reward, next_state, mask)
-                state = next_state
+            buffer_next_state = resolve_buffer_next_states(next_state, info)
+            mask = (~done).astype(np.float32)
+            self.memory.add_batch(state, action, reward, buffer_next_state, mask)
 
-                # Update networks
-                if len(self.memory) > self.config.batch_size:
-                    for _ in range(self.config.updates_per_step):
-                        losses = self.agent.update_parameters(
-                            self.memory, self.config.batch_size, self.updates
-                        )
-                        self.logger.log_dict(losses, self.updates, prefix="loss")
-                        self.updates += 1
+            self.total_steps += num_envs
+            episode_rewards += reward
+            episode_steps += 1
 
-            if self.total_steps > self.config.num_steps:
-                break
+            if len(self.memory) >= self.config.batch_size:
+                num_updates = max(int(self.config.updates_per_step * num_envs), 1)
+                for _ in range(num_updates):
+                    losses = self.agent.update_parameters(
+                        self.memory, self.config.batch_size, self.updates
+                    )
+                    self.logger.log_dict(losses, self.updates, prefix="loss")
+                    self.updates += 1
 
-            # Log training episode
-            self.logger.log_train(
-                step=self.total_steps,
-                episode=i_episode,
-                episode_steps=episode_steps,
-                reward=episode_reward,
-            )
-            self.logger.log_scalar("train/reward", episode_reward, self.total_steps)
-
-            # Evaluation
-            if self.config.eval and i_episode % self.config.eval_interval == 0:
-                result = self.evaluator.evaluate(
-                    num_episodes=self.config.eval_episodes,
+            finished_envs = np.flatnonzero(done)
+            for env_index in finished_envs:
+                self.completed_episodes += 1
+                self.logger.log_train(
                     step=self.total_steps,
+                    episode=self.completed_episodes,
+                    episode_steps=int(episode_steps[env_index]),
+                    reward=float(episode_rewards[env_index]),
                 )
-                # Checkpoint
-                self.ckpt_manager.save_if_needed(
-                    agent=self.agent,
-                    step=self.total_steps,
-                    epoch=i_episode,
-                    eval_reward=result["avg_reward"],
-                    buffer=self.memory,
+                self.logger.log_scalar(
+                    "train/reward",
+                    float(episode_rewards[env_index]),
+                    self.total_steps,
                 )
+                episode_rewards[env_index] = 0.0
+                episode_steps[env_index] = 0
+                self._maybe_evaluate()
+
+            state = next_state
 
         self.env.close()
         self.logger.log_info("Training completed.")

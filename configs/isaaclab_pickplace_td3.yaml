@@ -1,0 +1,12 @@
+_base_: "isaaclab_pickplace_base.yaml"
+
+algo: "TD3"
+tau: 0.005
+policy_noise: 0.2
+noise_clip: 0.5
+policy_freq: 2
+
+replay_size: 200000
+batch_size: 256
+start_steps: 2048
+updates_per_step: 1

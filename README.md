@@ -1,123 +1,239 @@
 # seen-e-rl
 
-A modular reinforcement learning framework built on PyTorch, supporting state-of-the-art continuous control algorithms:
+A modular reinforcement learning framework built on PyTorch for continuous control, now with:
 
-- **SAC** (Soft Actor-Critic) — Off-policy, entropy-maximized
-- **TD3** (Twin Delayed DDPG) — Off-policy, deterministically exploring
-- **PPO** (Proximal Policy Optimization) — On-policy, clipped surrogate objective
-- **OBAC** (Offline-Boosted Actor-Critic) — Off-policy, adaptively blends historical behaviors
+- batched Gymnasium training
+- Isaac Lab backend support
+- algorithm and model factories
+- shared batched trainer semantics across `SAC`, `TD3`, `PPO`, and `OBAC`
 
 ## Features
 
-- 📝 **YAML Configuration** — Hierarchical configs with CLI override support for hyper-parameter tuning
-- 🧩 **Modular Architecture** — Pluggable algorithms, networks, buffers, and trainers
-- 📊 **Unified Logging** — TensorBoard + wandb with standardized `[TRAIN]`/`[EVAL]` output metrics
-- 💾 **Checkpoint Management** — Multiple strategies (latest, best, interval)
-- 🔄 **Training Resumption** — Save/load buffer state for seamless script resume
-- 🔌 **Extensible Networks** — Registry pattern for custom architectures (VLA, Transformer)
-- 🛡️ **Robust Action Bounding** — Robust scaling and testing evaluators natively capable of handling custom asymmetrical Environment bounds seamlessly for algorithms like PPO/TD3.
+- YAML config loading with inheritance and CLI overrides
+- Algorithm registry: scripts and trainers no longer hardcode algorithm classes
+- Model factory: configurable actor / critic / value backbones through `model.*`
+- Environment factory: a single batched interface for Gymnasium and Isaac Lab
+- Parallel input support: Gym vector envs and Isaac Lab multi-env tasks share the same trainers
+- Unified logging, evaluation, and checkpointing
+- Legacy compatibility for existing `env_name` / `hidden_size` configs
 
-## Quick Start
-It is highly recommended to manage the virtual environment using `uv` for speed and dependency resolution.
+## Installation
 
-### Installation
+Using `uv` is recommended for the lightweight Gymnasium path:
 
 ```bash
-# Create and activate environment using uv
 uv venv
 source .venv/bin/activate
-
-# Install dependencies
 uv pip install -e .
+```
 
-# Or with wandb support:
+Optional extras:
+
+```bash
+uv pip install -e ".[dev]"
 uv pip install -e ".[wandb]"
 ```
 
-### Training
+### Isaac Lab Runtime
+
+Isaac Lab support is designed to run inside an Isaac Sim / Isaac Lab Python environment.
+
+Validated local assumptions for the new smoke setup:
+
+- `isaacsim 4.5.0.0`
+- Isaac Lab source at `/home/seene/workspace/IsaacLab`
+- GPU device available as `cuda:0`
+
+The code launches Isaac Lab through `AppLauncher` and expects task packages to be imported explicitly for blacklisted tasks such as pick-place.
+For the GR1T2 pick-place task, the runtime also applies two local compatibility patches:
+
+- reuse cached USD -> URDF outputs when Isaac Lab asks for forced reconversion
+- bypass Pink's `model.hasConfigurationLimit()` binding and derive the limit mask from the joint bounds instead
+
+## Quick Start
+
+### Gymnasium Training
+
+Single-env legacy style still works:
 
 ```bash
-# SAC on HalfCheetah
-uv run train.py --config configs/sac.yaml
-
-# PPO on Humanoid-v5
+uv run train.py --config configs/sac.yaml --env_name HalfCheetah-v4
 uv run train.py --config configs/ppo.yaml --env_name Humanoid-v5
-
-# TD3 with custom parameters
-uv run train.py --config configs/td3.yaml --env_name Ant-v5 --seed 123
-
-# Resume training from checkpoint
-uv run train.py --config configs/sac.yaml --resume results/xxx/checkpoints/latest.pt
 ```
 
+Parallel Gymnasium training uses the new nested env config:
+
+```bash
+uv run train.py --config configs/sac.yaml --env_name Pendulum-v1 --env.num_envs 8
+uv run train.py --config configs/ppo.yaml --env_name Pendulum-v1 --env.num_envs 16
+```
+
+### Isaac Lab Training
+
+Example configs are provided for `Isaac-PickPlace-GR1T2-Abs-v0`:
+
+```bash
+python train.py --config configs/isaaclab_pickplace_sac.yaml --env.num_envs 32
+python train.py --config configs/isaaclab_pickplace_td3.yaml --env.num_envs 32
+python train.py --config configs/isaaclab_pickplace_obac.yaml --env.num_envs 32
+python train.py --config configs/isaaclab_pickplace_ppo.yaml --env.num_envs 32
+```
+
+The default Isaac Lab validation target is:
+
+- `Isaac-PickPlace-GR1T2-Abs-v0`
+
+`Isaac-PickPlace-FixedBaseUpperBodyIK-G1-Abs-v0` is not the default target anymore because it currently depends on a missing remote locomanipulation URDF asset in this environment.
+
 ### Evaluation
-Evaluate without generating transitions:
 
 ```bash
 uv run evaluate.py --config configs/sac.yaml --checkpoint results/xxx/checkpoints/best.pt --num_episodes 10
+python evaluate.py --config configs/isaaclab_pickplace_ppo.yaml --checkpoint results/xxx/checkpoints/latest.pt --num_episodes 3
 ```
 
 ### Rendering
-Render the trained policies iteratively using Gymnasium rendering wrappers:
 
 ```bash
 uv run render/renderer.py --config configs/sac.yaml --checkpoint results/xxx/checkpoints/best.pt --episodes 5
 ```
 
+## Architecture
+
+The runtime is split into three layers:
+
+1. Algorithms
+   `seenerl.algorithms.registry` maps `algo -> class + trainer kind`
+2. Models
+   `seenerl.models` resolves `model.actor`, `model.critic`, and `model.value`
+3. Environments
+   `seenerl.envs` creates a batched adapter for Gymnasium or Isaac Lab
+
+Trainer code now consumes one common env API:
+
+```python
+obs, info = env.reset()
+next_obs, reward, terminated, truncated, info = env.step(actions)
+```
+
+Where:
+
+- `obs` is always batched
+- `actions` are always batched
+- `num_envs=1` is treated as a special case of batched execution
+
+## Config Schema
+
+### Environment
+
+New normalized environment block:
+
+```yaml
+env:
+  backend: "gymnasium"      # or "isaaclab"
+  id: "Pendulum-v1"
+  num_envs: 8
+  kwargs: {}
+  isaaclab:
+    headless: true
+    use_fabric: true
+    task_imports: []
+```
+
+Backward compatibility is preserved:
+
+- `env_name` still works
+- CLI `--env_name Foo-v0` still maps to `env.id`
+- `env.backend` defaults to `gymnasium`
+
+### Models
+
+New optional model block:
+
+```yaml
+model:
+  actor:
+    name: "gaussian"
+    hidden_dim: 256
+    kwargs:
+      squash: false
+  critic:
+    name: "q_network"
+    hidden_dim: 256
+    kwargs: {}
+  value:
+    name: "value_network"
+    hidden_dim: 256
+    kwargs: {}
+```
+
+Legacy compatibility is preserved:
+
+- `hidden_size` is still accepted
+- SAC still honors `policy_type`
+- if `model.*` is omitted, algorithm defaults are used
+
 ## Project Structure
 
 ```text
 seen-e-rl/
-├── configs/                  # YAML configurations (hyperparameters)
-│   ├── default.yaml          # Shared base defaults for all algorithms
-│   ├── sac.yaml              # Config overrides specific to SAC
-│   ├── td3.yaml              # Config overrides specific to TD3
-│   ├── ppo.yaml              # Config overrides specific to PPO
-│   └── obac.yaml             # Config overrides specific to OBAC
-├── seenerl/                  # Core library and logic package
-│   ├── algorithms/           # Implementations of RL algorithms
-│   │   ├── base.py           # Base algorithm interface class
-│   │   ├── obac.py           # Offline-Boosted Actor-Critic implementation    
-│   │   ├── ppo.py            # Proximal Policy Optimization implementation
-│   │   ├── sac.py            # Soft Actor-Critic implementation
-│   │   └── td3.py            # Twin Delayed DDPG implementation
-│   ├── networks/             # Neural network definitions and modules
-│   │   ├── base.py           # Abstract BaseActor and BaseCritic
-│   │   ├── mlp.py            # GaussianActor, DeterministicActor, and MLP Critics
-│   │   └── registry.py       # Centralized registry for dynamic network loads
-│   ├── buffers/              # Memory storage for transitions and rollouts
-│   │   ├── replay_buffer.py  # Standard O(1) buffer for off-policy algorithms
-│   │   └── rollout_buffer.py # Standard batching buffer for on-policy algorithms
-│   ├── trainers/             # Training loop logic
-│   │   ├── off_policy.py     # Single-env training loop for SAC/TD3/OBAC
-│   │   └── on_policy.py      # Batch-gathering training loop for PPO
-│   ├── evaluator.py          # Standalone robust action bounds evaluator
-│   ├── checkpoint.py         # Multi-strategy checkpoint saving and restoring manager
-│   ├── logger.py             # Handles writing to TensorBoard and Weights & Biases
-│   ├── config.py             # Safe YAML config loading and CLI argument overriding
-│   └── utils.py              # Assorted math, seeds, and device utilities
-├── render/                   # Scripts and utilities to easily visualize models
-│   └── renderer.py           # Evaluates algorithm with gymnasium's render_mode="human"
-├── tests/                    # Minimal environment testing and code smoke tests
-├── train.py                  # Main training entry point
-├── evaluate.py               # Main evaluating entry point without rendering
-└── pyproject.toml            # Project packaging metadata and pip dependencies
+├── configs/
+│   ├── default.yaml
+│   ├── sac.yaml
+│   ├── td3.yaml
+│   ├── ppo.yaml
+│   ├── obac.yaml
+│   ├── isaaclab_pickplace_base.yaml
+│   ├── isaaclab_pickplace_sac.yaml
+│   ├── isaaclab_pickplace_td3.yaml
+│   ├── isaaclab_pickplace_ppo.yaml
+│   └── isaaclab_pickplace_obac.yaml
+├── seenerl/
+│   ├── algorithms/
+│   ├── buffers/
+│   ├── envs/
+│   ├── models/
+│   ├── networks/
+│   ├── trainers/
+│   ├── checkpoint.py
+│   ├── config.py
+│   ├── evaluator.py
+│   ├── logger.py
+│   └── utils.py
+├── render/
+├── tests/
+├── train.py
+├── evaluate.py
+└── pyproject.toml
 ```
 
-## Configuration
+## Testing
 
-Configs use YAML with inheritance (`_base_` key) and runtime CLI overrides:
+Default lightweight tests:
 
-```yaml
-# configs/sac.yaml
-_base_: "default.yaml"    # Inherits all defaults
-algo: "SAC"
-alpha: 0.2
-automatic_entropy_tuning: false
+```bash
+pytest -q tests/test_config_normalization.py tests/test_buffers_batched.py tests/test_algorithm_registry.py tests/test_parallel_gym_smoke.py
 ```
 
-Override any parameter via CLI dynamically: `--key value` or `--nested.key value`.
+Opt-in Isaac Lab smoke tests:
 
+```bash
+SEENERL_RUN_ISAACLAB=1 pytest tests/test_isaaclab_pickplace.py -q
+```
+
+These tests expect a working Isaac Sim runtime and intentionally do not run by default.
+On the current local `isaacsim 4.5.0.0` setup, `Isaac-PickPlace-GR1T2-Abs-v0` now gets through `parse_env_cfg`, but `gym.make(...)` still fails later during physics backend initialization with `Failed to create simulation view backend`.
+The opt-in tests skip that known GR1T2 runtime failure instead of hanging indefinitely.
+
+## Notes for Isaac Lab
+
+- The code imports `isaacsim` before creating `AppLauncher`
+- Pick-place tasks are imported explicitly through `env.isaaclab.task_imports`
+- Pick-place startup reuses cached USD -> URDF artifacts to keep repeated GR1T2 launches practical
+- Pick-place runtime patches Pink's configuration-limit helper to avoid the local `std::vector<bool>` binding failure
+- The current default validation task is `Isaac-PickPlace-GR1T2-Abs-v0`
+- `Isaac-PickPlace-FixedBaseUpperBodyIK-G1-Abs-v0` currently fails in this environment because the remote asset `g1_29dof_with_hand_only_kinematics.urdf` is unavailable
+- On this specific `isaacsim 4.5.0.0` machine, `Isaac-PickPlace-GR1T2-Abs-v0` still stops inside Isaac Sim's physics backend after `parse_env_cfg`; upgrading Isaac Sim is the most likely fix for full end-to-end smoke training
 
 ## License
 

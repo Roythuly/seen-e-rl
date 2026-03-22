@@ -10,22 +10,24 @@ Usage:
 import os
 os.environ["TORCH_COMPILE_DISABLE"] = "1"
 
+from seenerl.algorithms import get_algorithm_spec
 from seenerl.config import parse_args_and_load_config
 
 
 def main():
     config = parse_args_and_load_config()
+    trainer_kind = get_algorithm_spec(config.algo).trainer_kind
 
-    algo = config.algo.upper()
-
-    if algo in ("SAC", "TD3", "OBAC"):
+    if trainer_kind == "off_policy":
         from seenerl.trainers.off_policy import OffPolicyTrainer
+
         trainer = OffPolicyTrainer(config)
-    elif algo == "PPO":
+    elif trainer_kind == "on_policy":
         from seenerl.trainers.on_policy import OnPolicyTrainer
+
         trainer = OnPolicyTrainer(config)
     else:
-        raise ValueError(f"Unknown algorithm: {config.algo}")
+        raise ValueError(f"Unknown trainer kind: {trainer_kind}")
 
     trainer.train()
 

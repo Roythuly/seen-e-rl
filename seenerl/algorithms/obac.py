@@ -1,151 +1,28 @@
-"""
-Offline-Boosted Actor-Critic (OBAC) algorithm.
-
-Reference: Luo et al., "Offline-Boosted Actor-Critic: Adaptively Blending Optimal Historical Behaviors in Deep Off-Policy RL", 2024.
-"""
+"""Offline-Boosted Actor-Critic (OBAC) algorithm."""
 
 import copy
 from typing import Any, Dict
 
 import numpy as np
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
-from torch.distributions import Normal
 from torch.optim import Adam
 
 from seenerl.algorithms.base import BaseAlgorithm
-from seenerl.utils import soft_update
+from seenerl.algorithms.registry import register_algorithm
+from seenerl.models import build_actor_model, build_q_critic_model, build_value_model
+from seenerl.utils import resolve_device, soft_update
 
 
 LOG_SIG_MAX = 2
 LOG_SIG_MIN = -20
-epsilon = 1e-6
 
-def weights_init_(m):
-    """Xavier uniform initialization for Linear layers."""
-    if isinstance(m, nn.Linear):
-        torch.nn.init.xavier_uniform_(m.weight, gain=1)
-        torch.nn.init.constant_(m.bias, 0)
-
-
-class OBACValueNetwork(nn.Module):
-    def __init__(self, num_inputs, hidden_dim):
-        super(OBACValueNetwork, self).__init__()
-
-        self.linear1 = nn.Linear(num_inputs, hidden_dim)
-        self.linear2 = nn.Linear(hidden_dim, hidden_dim)
-        self.LayerNorm = nn.LayerNorm(hidden_dim)
-        self.linear3 = nn.Linear(hidden_dim, 1)
-
-        self.apply(weights_init_)
-
-    def forward(self, state):
-        x = torch.tanh(self.LayerNorm((self.linear1(state))))
-        x = F.elu(self.linear2(x))
-        x = self.linear3(x)
-        return x
-
-
-class OBACQNetwork(nn.Module):
-    def __init__(self, num_inputs, num_actions, hidden_dim):
-        super(OBACQNetwork, self).__init__()
-
-        # Q1 architecture
-        self.linear1 = nn.Linear(num_inputs + num_actions, hidden_dim)
-        self.linear2 = nn.Linear(hidden_dim, hidden_dim)
-        self.LayerNorm1 = nn.LayerNorm(hidden_dim)
-        self.linear3 = nn.Linear(hidden_dim, 1)
-
-        # Q2 architecture
-        self.linear4 = nn.Linear(num_inputs + num_actions, hidden_dim)
-        self.linear5 = nn.Linear(hidden_dim, hidden_dim)
-        self.LayerNorm2 = nn.LayerNorm(hidden_dim)
-        self.linear6 = nn.Linear(hidden_dim, 1)
-
-        self.apply(weights_init_)
-
-    def forward(self, state, action):
-        xu = torch.cat([state, action], 1)
-        
-        x1 = torch.tanh(self.LayerNorm1(self.linear1(xu)))
-        x1 = F.elu(self.linear2(x1))
-        x1 = self.linear3(x1)
-
-        x2 = torch.tanh(self.LayerNorm2(self.linear4(xu)))
-        x2 = F.elu(self.linear5(x2))
-        x2 = self.linear6(x2)
-
-        return x1, x2
-
-
-class OBACGaussianPolicy(nn.Module):
-    def __init__(self, num_inputs, num_actions, hidden_dim, action_space=None):
-        super(OBACGaussianPolicy, self).__init__()
-        
-        self.linear1 = nn.Linear(num_inputs, hidden_dim)
-        self.linear2 = nn.Linear(hidden_dim, hidden_dim)
-        self.LayerNorm = nn.LayerNorm(hidden_dim)
-
-        self.mean_linear = nn.Linear(hidden_dim, num_actions)
-        self.log_std_linear = nn.Linear(hidden_dim, num_actions)
-
-        self.apply(weights_init_)
-
-        # action rescaling
-        if action_space is None:
-            self.action_scale = torch.tensor(1.)
-            self.action_bias = torch.tensor(0.)
-        else:
-            self.action_scale = torch.FloatTensor(
-                (action_space.high - action_space.low) / 2.)
-            self.action_bias = torch.FloatTensor(
-                (action_space.high + action_space.low) / 2.)
-
-    def forward(self, state):
-        x = torch.tanh(self.LayerNorm((self.linear1(state))))
-        x = F.elu(self.linear2(x))
-        mean = self.mean_linear(x)
-        log_std = self.log_std_linear(x)
-        log_std = torch.clamp(log_std, min=LOG_SIG_MIN, max=LOG_SIG_MAX)
-        return mean, log_std
-
-    def sample(self, state):
-        mean, log_std = self.forward(state)
-        std = log_std.exp()
-        normal = Normal(mean, std)
-        x_t = normal.rsample()  # for reparameterization trick (mean + std * N(0,1))
-        y_t = torch.tanh(x_t)
-        action = y_t * self.action_scale + self.action_bias
-        log_prob = normal.log_prob(x_t)
-        # Enforcing Action Bound
-        log_prob -= torch.log(self.action_scale * (1 - y_t.pow(2)) + epsilon)
-        log_prob = log_prob.sum(1, keepdim=True)
-        mean = torch.tanh(mean) * self.action_scale + self.action_bias
-        return action, log_prob, mean
-    
-    def get_log_density(self, state, action):
-        mean, log_std = self.forward(state)
-        std = log_std.exp()
-        normal = Normal(mean, std)
-        y_t = (action - self.action_bias) / self.action_scale
-        log_density = normal.log_prob(y_t)
-        return log_density
-
-    def to(self, device):
-        self.action_scale = self.action_scale.to(device)
-        self.action_bias = self.action_bias.to(device)
-        return super(OBACGaussianPolicy, self).to(device)
-
-
+@register_algorithm("OBAC", trainer_kind="off_policy")
 class OBAC(BaseAlgorithm):
     """Offline-Boosted Actor-Critic (OBAC) algorithm."""
 
     def __init__(self, obs_dim: int, action_space, config):
-        device = torch.device(config.device) if config.device != "auto" else (
-            torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        )
-        super().__init__(device)
+        super().__init__(resolve_device(config.device))
 
         self.gamma = config.gamma
         self.tau = config.tau
@@ -156,13 +33,20 @@ class OBAC(BaseAlgorithm):
         self.target_update_interval = config.get("target_update_interval", 1)
         self.automatic_entropy_tuning = config.get("automatic_entropy_tuning", True)
 
-        action_dim = action_space.shape[0]
-        hidden_size = config.hidden_size
-
-        self.critic = OBACQNetwork(obs_dim, action_dim, hidden_size).to(self.device)
+        self.critic = build_q_critic_model(
+            config,
+            obs_dim,
+            action_space,
+            default_name="obac_q_network",
+        ).to(self.device)
         self.critic_optim = Adam(self.critic.parameters(), lr=config.lr)
 
-        self.critic_target = OBACQNetwork(obs_dim, action_dim, hidden_size).to(self.device)
+        self.critic_target = build_q_critic_model(
+            config,
+            obs_dim,
+            action_space,
+            default_name="obac_q_network",
+        ).to(self.device)
         self.critic_target.load_state_dict(self.critic.state_dict())
 
         # Target Entropy
@@ -171,31 +55,50 @@ class OBAC(BaseAlgorithm):
             self.log_alpha = torch.zeros(1, requires_grad=True, device=self.device)
             self.alpha_optim = Adam([self.log_alpha], lr=config.lr)
 
-        self.policy = OBACGaussianPolicy(obs_dim, action_dim, hidden_size, action_space).to(self.device)
+        self.policy = build_actor_model(
+            config,
+            obs_dim,
+            action_space,
+            default_name="obac_gaussian",
+        ).to(self.device)
         self.policy_optim = Adam(self.policy.parameters(), lr=config.lr)
         
         # Behavior policy critics
-        self.critic_buffer = OBACQNetwork(obs_dim, action_dim, hidden_size).to(self.device)
+        self.critic_buffer = build_q_critic_model(
+            config,
+            obs_dim,
+            action_space,
+            default_name="obac_q_network",
+        ).to(self.device)
         self.critic_buffer_optim = Adam(self.critic_buffer.parameters(), lr=config.lr)
         self.critic_buffer.load_state_dict(self.critic.state_dict())
 
-        self.critic_target_buffer = OBACQNetwork(obs_dim, action_dim, hidden_size).to(self.device)
+        self.critic_target_buffer = build_q_critic_model(
+            config,
+            obs_dim,
+            action_space,
+            default_name="obac_q_network",
+        ).to(self.device)
         self.critic_target_buffer.load_state_dict(self.critic_buffer.state_dict())
 
-        self.V_critic_buffer = OBACValueNetwork(obs_dim, hidden_size).to(self.device)
+        self.V_critic_buffer = build_value_model(
+            config,
+            obs_dim,
+            default_name="obac_value_network",
+        ).to(self.device)
         self.V_critic_buffer_optim = Adam(self.V_critic_buffer.parameters(), lr=config.lr)
 
         self._last_policy_loss = 0.0
         self._last_alpha_loss = 0.0
 
     def select_action(self, state: np.ndarray, evaluate: bool = False) -> np.ndarray:
-        state_t = torch.FloatTensor(state).to(self.device).unsqueeze(0)
+        state_t, single = self._prepare_state_tensor(state)
         with torch.no_grad():
             if evaluate:
                 _, _, action = self.policy.sample(state_t)
             else:
                 action, _, _ = self.policy.sample(state_t)
-        return action.detach().cpu().numpy()[0]
+        return self._format_action_output(action, single)
 
     def update_parameters(self, memory, batch_size: int, updates: int) -> Dict[str, float]:
         state_batch, action_batch, reward_batch, next_state_batch, mask_batch = memory.sample(batch_size=batch_size)

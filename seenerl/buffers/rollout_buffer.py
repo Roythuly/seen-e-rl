@@ -22,7 +22,7 @@ class RolloutBuffer:
         4. Call `reset()` to prepare for next rollout
     """
 
-    def __init__(self, rollout_steps: int, obs_dim: int, action_dim: int):
+    def __init__(self, rollout_steps: int, num_envs: int, obs_dim: int, action_dim: int):
         """
         Args:
             rollout_steps: Number of transitions to collect per rollout.
@@ -30,31 +30,38 @@ class RolloutBuffer:
             action_dim: Dimension of action space.
         """
         self.rollout_steps = rollout_steps
+        self.num_envs = num_envs
         self.obs_dim = obs_dim
         self.action_dim = action_dim
         self.reset()
 
     def reset(self) -> None:
         """Clear all stored data for a new rollout."""
-        self.states = np.zeros((self.rollout_steps, self.obs_dim), dtype=np.float32)
-        self.actions = np.zeros((self.rollout_steps, self.action_dim), dtype=np.float32)
-        self.rewards = np.zeros((self.rollout_steps, 1), dtype=np.float32)
-        self.dones = np.zeros((self.rollout_steps, 1), dtype=np.float32)
-        self.log_probs = np.zeros((self.rollout_steps, 1), dtype=np.float32)
-        self.values = np.zeros((self.rollout_steps, 1), dtype=np.float32)
+        self.states = np.zeros(
+            (self.rollout_steps, self.num_envs, self.obs_dim),
+            dtype=np.float32,
+        )
+        self.actions = np.zeros(
+            (self.rollout_steps, self.num_envs, self.action_dim),
+            dtype=np.float32,
+        )
+        self.rewards = np.zeros((self.rollout_steps, self.num_envs), dtype=np.float32)
+        self.dones = np.zeros((self.rollout_steps, self.num_envs), dtype=np.float32)
+        self.log_probs = np.zeros((self.rollout_steps, self.num_envs), dtype=np.float32)
+        self.values = np.zeros((self.rollout_steps, self.num_envs), dtype=np.float32)
 
-        self.advantages = np.zeros((self.rollout_steps, 1), dtype=np.float32)
-        self.returns = np.zeros((self.rollout_steps, 1), dtype=np.float32)
+        self.advantages = np.zeros((self.rollout_steps, self.num_envs), dtype=np.float32)
+        self.returns = np.zeros((self.rollout_steps, self.num_envs), dtype=np.float32)
 
         self.position = 0
 
-    def add(self, state: np.ndarray, action: np.ndarray, reward: float,
-            done: bool, log_prob: float, value: float) -> None:
-        """Add a single transition to the buffer."""
+    def add(self, state: np.ndarray, action: np.ndarray, reward: np.ndarray,
+            done: np.ndarray, log_prob: np.ndarray, value: np.ndarray) -> None:
+        """Add a batched transition to the buffer."""
         self.states[self.position] = state
         self.actions[self.position] = action
         self.rewards[self.position] = reward
-        self.dones[self.position] = float(done)
+        self.dones[self.position] = done
         self.log_probs[self.position] = log_prob
         self.values[self.position] = value
         self.position += 1
@@ -65,7 +72,7 @@ class RolloutBuffer:
         return self.position >= self.rollout_steps
 
     def compute_returns_and_advantages(
-        self, last_value: float, gamma: float = 0.99, gae_lambda: float = 0.95
+        self, last_value: np.ndarray, gamma: float = 0.99, gae_lambda: float = 0.95
     ) -> None:
         """
         Compute GAE advantages and discounted returns.
@@ -78,7 +85,8 @@ class RolloutBuffer:
             gamma: Discount factor.
             gae_lambda: GAE smoothing parameter.
         """
-        last_gae = 0.0
+        last_value = np.asarray(last_value, dtype=np.float32).reshape(self.num_envs)
+        last_gae = np.zeros(self.num_envs, dtype=np.float32)
         for t in reversed(range(self.rollout_steps)):
             if t == self.rollout_steps - 1:
                 next_value = last_value
@@ -110,25 +118,29 @@ class RolloutBuffer:
         Yields:
             (states, actions, old_log_probs, advantages, returns) tensors.
         """
-        batch_size = self.rollout_steps
-        mini_batch_size = batch_size // num_mini_batch
+        batch_size = self.rollout_steps * self.num_envs
+        mini_batch_size = max(batch_size // num_mini_batch, 1)
         indices = np.random.permutation(batch_size)
 
         # Normalize advantages
-        adv = self.advantages.copy()
+        adv = self.advantages.reshape(-1).copy()
         adv_mean = adv.mean()
         adv_std = adv.std() + 1e-8
         adv = (adv - adv_mean) / adv_std
 
+        states = self.states.reshape(batch_size, self.obs_dim)
+        actions = self.actions.reshape(batch_size, self.action_dim)
+        log_probs = self.log_probs.reshape(batch_size, 1)
+        returns = self.returns.reshape(batch_size, 1)
+        advantages = adv.reshape(batch_size, 1)
+
         for start in range(0, batch_size, mini_batch_size):
             end = start + mini_batch_size
-            if end > batch_size:
-                break
             idx = indices[start:end]
             yield (
-                torch.FloatTensor(self.states[idx]).to(device),
-                torch.FloatTensor(self.actions[idx]).to(device),
-                torch.FloatTensor(self.log_probs[idx]).to(device),
-                torch.FloatTensor(adv[idx]).to(device),
-                torch.FloatTensor(self.returns[idx]).to(device),
+                torch.as_tensor(states[idx], dtype=torch.float32, device=device),
+                torch.as_tensor(actions[idx], dtype=torch.float32, device=device),
+                torch.as_tensor(log_probs[idx], dtype=torch.float32, device=device),
+                torch.as_tensor(advantages[idx], dtype=torch.float32, device=device),
+                torch.as_tensor(returns[idx], dtype=torch.float32, device=device),
             )

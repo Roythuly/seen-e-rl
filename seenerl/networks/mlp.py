@@ -128,7 +128,8 @@ class DeterministicActor(BaseActor):
         noise = self.noise.normal_(0.0, std=0.1)
         noise = noise.clamp(-0.25, 0.25)
         action = mean + noise
-        return action, torch.tensor(0.0), mean
+        log_prob = torch.zeros((state.shape[0], 1), dtype=state.dtype, device=state.device)
+        return action, log_prob, mean
 
     def to(self, device):
         self.action_scale = self.action_scale.to(device)

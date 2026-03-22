@@ -15,15 +15,11 @@ import sympy
 
 import argparse
 
-import gymnasium as gym
-
-from seenerl.algorithms.sac import SAC
-from seenerl.algorithms.td3 import TD3
-from seenerl.algorithms.ppo import PPO
+from seenerl.algorithms import build_algorithm
 from seenerl.checkpoint import CheckpointManager
 from seenerl.config import load_config
+from seenerl.envs import create_env
 from seenerl.evaluator import Evaluator
-from seenerl.logger import TrainingLogger
 
 
 def main():
@@ -35,21 +31,9 @@ def main():
     args = parser.parse_args()
 
     config = load_config(args.config)
-    env_name = config.env_name
     render_mode = "human" if args.render else None
-    env = gym.make(env_name, render_mode=render_mode)
-
-    obs_dim = env.observation_space.shape[0]
-    algo = config.algo.upper()
-
-    if algo == "SAC":
-        agent = SAC(obs_dim, env.action_space, config)
-    elif algo == "TD3":
-        agent = TD3(obs_dim, env.action_space, config)
-    elif algo == "PPO":
-        agent = PPO(obs_dim, env.action_space, config)
-    else:
-        raise ValueError(f"Unknown algorithm: {config.algo}")
+    env = create_env(config, num_envs=1, render_mode=render_mode)
+    agent = build_algorithm(config, env.observation_space, env.action_space)
 
     # Load checkpoint
     CheckpointManager.load(args.checkpoint, agent, evaluate=True)
@@ -59,7 +43,7 @@ def main():
     result = evaluator.evaluate(num_episodes=args.num_episodes)
 
     print("=" * 60)
-    print(f"Environment: {env_name}")
+    print(f"Environment: {config.env.id}")
     print(f"Algorithm:   {config.algo}")
     print(f"Episodes:    {args.num_episodes}")
     print(f"Avg Reward:  {result['avg_reward']:.2f}")

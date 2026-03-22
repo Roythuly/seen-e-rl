@@ -1,14 +1,4 @@
-"""
-Proximal Policy Optimization (PPO) algorithm implementation.
-
-Reference: Schulman et al., "Proximal Policy Optimization Algorithms", 2017.
-
-Key features:
-  - Clipped surrogate objective
-  - Generalized Advantage Estimation (GAE)
-  - Value function clipping (optional)
-  - Entropy bonus for exploration
-"""
+"""Proximal Policy Optimization (PPO) algorithm implementation."""
 
 from typing import Any, Dict
 
@@ -18,9 +8,12 @@ import torch.nn.functional as F
 from torch.optim import Adam
 
 from seenerl.algorithms.base import BaseAlgorithm
-from seenerl.networks.mlp import GaussianActor, MLPValue
+from seenerl.algorithms.registry import register_algorithm
+from seenerl.models import build_actor_model, build_value_model
+from seenerl.utils import resolve_device
 
 
+@register_algorithm("PPO", trainer_kind="on_policy")
 class PPO(BaseAlgorithm):
     """
     PPO with clipped surrogate objective.
@@ -37,13 +30,7 @@ class PPO(BaseAlgorithm):
             action_space: Gymnasium action space.
             config: Configuration object with PPO parameters.
         """
-        device = torch.device(config.device) if config.device != "auto" else (
-            torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        )
-        super().__init__(device)
-
-        action_dim = action_space.shape[0]
-        hidden_size = config.hidden_size
+        super().__init__(resolve_device(config.device))
 
         self.clip_param = config.get("clip_param", 0.2)
         self.ppo_epoch = config.get("ppo_epoch", 10)
@@ -53,13 +40,21 @@ class PPO(BaseAlgorithm):
         self.max_grad_norm = config.get("max_grad_norm", 0.5)
 
         # Actor (Gaussian policy without tanh squashing for PPO)
-        self.actor = GaussianActor(
-            obs_dim, action_dim, hidden_size, action_space, squash=False
+        self.actor = build_actor_model(
+            config,
+            obs_dim,
+            action_space,
+            default_name="gaussian",
+            default_kwargs={"squash": False},
         ).to(self.device)
         self.actor_optim = Adam(self.actor.parameters(), lr=config.lr)
 
         # Critic (Value network)
-        self.value_net = MLPValue(obs_dim, hidden_size).to(self.device)
+        self.value_net = build_value_model(
+            config,
+            obs_dim,
+            default_name="value_network",
+        ).to(self.device)
         self.value_optim = Adam(self.value_net.parameters(), lr=config.lr)
 
     def select_action(self, state: np.ndarray, evaluate: bool = False):
@@ -72,27 +67,26 @@ class PPO(BaseAlgorithm):
             If evaluate: action numpy array
             Otherwise: (action, log_prob, value) tuple
         """
-        state_t = torch.FloatTensor(state).to(self.device).unsqueeze(0)
+        state_t, single = self._prepare_state_tensor(state)
 
         with torch.no_grad():
             if evaluate:
                 _, _, action = self.actor.sample(state_t)
-                return action.cpu().numpy()[0]
+                return self._format_action_output(action, single)
             else:
                 action, log_prob, _ = self.actor.sample(state_t)
                 value = self.value_net(state_t)
-                return (
-                    action.cpu().numpy()[0],
-                    log_prob.cpu().numpy()[0, 0],
-                    value.cpu().numpy()[0, 0],
-                )
+                actions = self._format_action_output(action, single)
+                log_probs = self._format_scalar_output(log_prob, single)
+                values = self._format_scalar_output(value, single)
+                return actions, log_probs, values
 
     def get_value(self, state: np.ndarray) -> float:
         """Estimate V(s) for the given state."""
-        state_t = torch.FloatTensor(state).to(self.device).unsqueeze(0)
+        state_t, single = self._prepare_state_tensor(state)
         with torch.no_grad():
             value = self.value_net(state_t)
-        return value.cpu().numpy()[0, 0]
+        return self._format_scalar_output(value, single)
 
     def update_parameters(self, rollout_buffer) -> Dict[str, float]:
         """

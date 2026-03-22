@@ -25,6 +25,27 @@ class BaseAlgorithm(ABC):
     def __init__(self, device: torch.device):
         self.device = device
 
+    def _prepare_state_tensor(self, state) -> tuple[torch.Tensor, bool]:
+        """Convert a single or batched observation into a batched tensor."""
+        if isinstance(state, torch.Tensor):
+            state_t = state.to(self.device, dtype=torch.float32)
+        else:
+            state_t = torch.as_tensor(state, dtype=torch.float32, device=self.device)
+        single = state_t.ndim == 1
+        if single:
+            state_t = state_t.unsqueeze(0)
+        return state_t, single
+
+    @staticmethod
+    def _format_action_output(action: torch.Tensor, single: bool) -> np.ndarray:
+        action_np = action.detach().cpu().numpy()
+        return action_np[0] if single else action_np
+
+    @staticmethod
+    def _format_scalar_output(value: torch.Tensor, single: bool):
+        value_np = value.detach().cpu().numpy().reshape(-1)
+        return float(value_np[0]) if single else value_np
+
     @abstractmethod
     def select_action(self, state: np.ndarray, evaluate: bool = False) -> np.ndarray:
         """

@@ -10,7 +10,6 @@ Supports:
 import argparse
 import os
 from copy import deepcopy
-from pathlib import Path
 from typing import Any, Dict, Optional, Sequence
 
 import yaml
@@ -115,8 +114,95 @@ def _apply_overrides(cfg: dict, overrides: Sequence[str]) -> dict:
                     d[k] = {}
                 d = d[k]
             d[keys[-1]] = value
+            if key == "env_name":
+                cfg.setdefault("env", {})
+                if not isinstance(cfg["env"], dict):
+                    cfg["env"] = {}
+                cfg["env"]["id"] = value
+            elif key == "env_backend":
+                cfg.setdefault("env", {})
+                if not isinstance(cfg["env"], dict):
+                    cfg["env"] = {}
+                cfg["env"]["backend"] = value
         else:
             i += 1
+    return cfg
+
+
+def _default_isaaclab_task_imports(env_id: str) -> list[str]:
+    """Infer Isaac Lab task imports for blacklisted task packages."""
+    if "Locomanipulation" in env_id or "FixedBaseUpperBodyIK" in env_id:
+        return ["isaaclab_tasks.manager_based.locomanipulation.pick_place"]
+    if any(token in env_id for token in ("PickPlace", "NutPour", "ExhaustPipe")):
+        return ["isaaclab_tasks.manager_based.manipulation.pick_place"]
+    return []
+
+
+def _normalize_model_config(cfg: dict) -> None:
+    """Normalize optional nested model configuration."""
+    model_cfg = deepcopy(cfg.get("model", {}))
+    for key in ("actor", "critic", "value"):
+        section = deepcopy(model_cfg.get(key, {}))
+        if not isinstance(section, dict):
+            section = {}
+        if "hidden_size" in section and "hidden_dim" not in section:
+            section["hidden_dim"] = section.pop("hidden_size")
+        kwargs = deepcopy(section.get("kwargs", {}))
+        if not isinstance(kwargs, dict):
+            kwargs = {}
+        section["kwargs"] = kwargs
+        if section:
+            model_cfg[key] = section
+    cfg["model"] = model_cfg
+
+
+def _normalize_env_config(cfg: dict) -> None:
+    """Normalize environment configuration while keeping legacy keys working."""
+    env_cfg = deepcopy(cfg.get("env", {}))
+    if not isinstance(env_cfg, dict):
+        env_cfg = {}
+
+    legacy_env_name = cfg.get("env_name")
+    legacy_backend = cfg.get("env_backend")
+
+    env_cfg.setdefault("backend", legacy_backend or "gymnasium")
+    env_cfg.setdefault("id", legacy_env_name)
+    env_cfg.setdefault("num_envs", 1)
+
+    kwargs = deepcopy(env_cfg.get("kwargs", {}))
+    if not isinstance(kwargs, dict):
+        kwargs = {}
+    env_cfg["kwargs"] = kwargs
+
+    isaaclab_cfg = deepcopy(env_cfg.get("isaaclab", {}))
+    if not isinstance(isaaclab_cfg, dict):
+        isaaclab_cfg = {}
+    isaaclab_cfg.setdefault("headless", True)
+    isaaclab_cfg.setdefault("use_fabric", None)
+
+    task_imports = isaaclab_cfg.get("task_imports")
+    if task_imports is None:
+        task_imports = []
+    elif isinstance(task_imports, str):
+        task_imports = [task_imports]
+    else:
+        task_imports = list(task_imports)
+
+    if env_cfg["backend"] == "isaaclab" and not task_imports and env_cfg["id"]:
+        task_imports = _default_isaaclab_task_imports(env_cfg["id"])
+
+    isaaclab_cfg["task_imports"] = task_imports
+    env_cfg["isaaclab"] = isaaclab_cfg
+
+    cfg["env"] = env_cfg
+    if env_cfg["id"] is not None:
+        cfg["env_name"] = env_cfg["id"]
+
+
+def _normalize_config(cfg: dict) -> dict:
+    """Apply compatibility normalization for config consumers."""
+    _normalize_env_config(cfg)
+    _normalize_model_config(cfg)
     return cfg
 
 
@@ -141,6 +227,8 @@ def load_config(
 
     if cli_args:
         cfg = _apply_overrides(cfg, list(cli_args))
+
+    cfg = _normalize_config(cfg)
 
     return Config(cfg)
 
