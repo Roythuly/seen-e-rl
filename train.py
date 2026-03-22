@@ -7,6 +7,9 @@ Usage:
     python train.py --config configs/sac.yaml --resume results/xxx/checkpoints/latest.pt
 """
 
+import os
+os.environ["TORCH_COMPILE_DISABLE"] = "1"
+
 from seenerl.config import parse_args_and_load_config
 
 

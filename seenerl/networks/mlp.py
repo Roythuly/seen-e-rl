@@ -18,16 +18,20 @@ class GaussianActor(BaseActor):
     """
     Gaussian policy network for continuous action spaces.
 
-    Outputs a squashed Gaussian distribution (tanh transform).
-    Used by SAC and PPO.
+    Supports squashed Gaussian distribution (tanh transform) for SAC,
+    and unsquashed distribution for PPO.
     """
 
     def __init__(self, num_inputs: int, num_actions: int, hidden_dim: int = 256,
-                 action_space=None):
+                 action_space=None, squash: bool = True):
         super().__init__()
+        self.squash = squash
         self.linear1 = nn.Linear(num_inputs, hidden_dim)
         self.linear2 = nn.Linear(hidden_dim, hidden_dim)
         self.mean_linear = nn.Linear(hidden_dim, num_actions)
+        
+        # PPO usually prefers state-independent log_std, but state-dependent is okay.
+        # We keep state-dependent log_std for compatibility with SAC.
         self.log_std_linear = nn.Linear(hidden_dim, num_actions)
         self.apply(weights_init_)
 
@@ -52,36 +56,26 @@ class GaussianActor(BaseActor):
         return mean, log_std
 
     def sample(self, state: torch.Tensor):
-        """
-        Sample action via reparameterization trick.
-
-        Returns:
-            (action, log_prob, mean_action)
-        """
         mean, log_std = self.forward(state)
         std = log_std.exp()
         normal = Normal(mean, std)
         x_t = normal.rsample()
-        y_t = torch.tanh(x_t)
-        action = y_t * self.action_scale + self.action_bias
-        log_prob = normal.log_prob(x_t)
-        # Enforcing action bound correction
-        log_prob -= torch.log(self.action_scale * (1 - y_t.pow(2)) + EPSILON)
-        log_prob = log_prob.sum(1, keepdim=True)
-        mean_action = torch.tanh(mean) * self.action_scale + self.action_bias
+        
+        if self.squash:
+            y_t = torch.tanh(x_t)
+            action = y_t * self.action_scale + self.action_bias
+            log_prob = normal.log_prob(x_t)
+            log_prob -= torch.log(self.action_scale * (1 - y_t.pow(2)) + EPSILON)
+            log_prob = log_prob.sum(1, keepdim=True)
+            mean_action = torch.tanh(mean) * self.action_scale + self.action_bias
+        else:
+            action = x_t
+            log_prob = normal.log_prob(x_t).sum(1, keepdim=True)
+            mean_action = mean
+
         return action, log_prob, mean_action
 
     def evaluate_actions(self, state: torch.Tensor, action: torch.Tensor):
-        """
-        Evaluate log_prob and entropy for given state-action pairs.
-        Used by PPO for importance sampling ratio computation.
-
-        Note: For PPO, we do NOT apply tanh squashing. The actions stored
-        in the rollout buffer are pre-tanh values when using PPO.
-
-        Returns:
-            (log_prob, entropy)
-        """
         mean, log_std = self.forward(state)
         std = log_std.exp()
         normal = Normal(mean, std)

@@ -5,6 +5,8 @@ Loads a checkpoint, runs episodes with rendering, and optionally records video.
 """
 
 import os
+os.environ["TORCH_COMPILE_DISABLE"] = "1"
+
 from typing import Optional
 
 import gymnasium as gym
@@ -70,7 +72,15 @@ class Renderer:
 
             while not (done or truncated):
                 action = self.agent.select_action(state, evaluate=True)
-                state, reward, done, truncated, info = env.step(action)
+
+                if hasattr(env.action_space, "low") and hasattr(env.action_space, "high"):
+                    clipped_action = np.clip(
+                        action, env.action_space.low, env.action_space.high
+                    )
+                else:
+                    clipped_action = action
+
+                state, reward, done, truncated, info = env.step(clipped_action)
                 episode_reward += reward
 
             print(f"Episode {ep + 1}: reward = {episode_reward:.2f}")

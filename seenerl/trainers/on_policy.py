@@ -121,7 +121,12 @@ class OnPolicyTrainer:
         for step in range(self.config.rollout_steps):
             action, log_prob, value = self.agent.select_action(state)
 
-            next_state, reward, done, truncated, info = self.env.step(action)
+            # Env requires actions within its bounds. Clip for env.step,
+            # but keep the original unbounded action for the rollout buffer.
+            clipped_action = np.clip(
+                action, self.env.action_space.low, self.env.action_space.high
+            )
+            next_state, reward, done, truncated, info = self.env.step(clipped_action)
             self.total_steps += 1
             episode_reward += reward
             episode_steps += 1

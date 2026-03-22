@@ -33,9 +33,10 @@ class TD3(BaseAlgorithm):
         self.tau = config.tau
         self.discount = config.gamma
         self.policy_freq = config.get("policy_freq", 2)
-        self.noise_clip = config.get("noise_clip", 0.5)
-        self.policy_noise = config.get("policy_noise", 0.2)
         self.max_action = float(action_space.high[0])
+        self.noise_clip = config.get("noise_clip", 0.5) * self.max_action
+        self.policy_noise = config.get("policy_noise", 0.2) * self.max_action
+        self.exploration_noise = config.get("exploration_noise", 0.1)
 
         # Networks
         self.policy = DeterministicActor(
@@ -53,6 +54,11 @@ class TD3(BaseAlgorithm):
     def select_action(self, state: np.ndarray, evaluate: bool = False) -> np.ndarray:
         state_t = torch.FloatTensor(state).to(self.device).unsqueeze(0)
         action = self.policy(state_t).detach().cpu().numpy()[0]
+        
+        if not evaluate:
+            noise = np.random.normal(0, self.exploration_noise * self.max_action, size=action.shape)
+            action = np.clip(action + noise, -self.max_action, self.max_action)
+            
         return action
 
     def update_parameters(self, memory, batch_size: int, updates: int) -> Dict[str, float]:

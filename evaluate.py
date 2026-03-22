@@ -7,6 +7,12 @@ Usage:
                        --num_episodes 10
 """
 
+import os
+os.environ["TORCH_COMPILE_DISABLE"] = "1"
+
+# Import sympy first to prevent gymnasium/torch import order conflicts
+import sympy
+
 import argparse
 
 import gymnasium as gym

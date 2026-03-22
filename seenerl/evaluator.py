@@ -56,7 +56,15 @@ class Evaluator:
 
             while not (done or truncated):
                 action = self.agent.select_action(state, evaluate=True)
-                next_state, reward, done, truncated, info = self.env.step(action)
+
+                if hasattr(self.env.action_space, "low") and hasattr(self.env.action_space, "high"):
+                    clipped_action = np.clip(
+                        action, self.env.action_space.low, self.env.action_space.high
+                    )
+                else:
+                    clipped_action = action
+
+                next_state, reward, done, truncated, info = self.env.step(clipped_action)
                 episode_reward += reward
                 state = next_state
 

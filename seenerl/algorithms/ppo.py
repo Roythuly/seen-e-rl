@@ -54,7 +54,7 @@ class PPO(BaseAlgorithm):
 
         # Actor (Gaussian policy without tanh squashing for PPO)
         self.actor = GaussianActor(
-            obs_dim, action_dim, hidden_size, action_space
+            obs_dim, action_dim, hidden_size, action_space, squash=False
         ).to(self.device)
         self.actor_optim = Adam(self.actor.parameters(), lr=config.lr)
 

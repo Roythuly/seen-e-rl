@@ -9,7 +9,7 @@ algo: "PPO"
 # --- PPO-specific ---
 clip_param: 0.2            # PPO clipping parameter ε
 ppo_epoch: 10              # Number of optimization epochs per rollout
-num_mini_batch: 32         # Number of mini-batches per epoch
+num_mini_batch: 32        # Number of mini-batches per epoch
 value_loss_coef: 0.5       # Value loss coefficient c1
 entropy_coef: 0.01         # Entropy bonus coefficient c2
 max_grad_norm: 0.5         # Gradient clipping
