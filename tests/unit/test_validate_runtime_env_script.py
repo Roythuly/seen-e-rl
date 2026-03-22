@@ -34,6 +34,15 @@ def test_validate_runtime_env_builds_single_candidate_from_explicit_backend(monk
     assert candidates == ["glfw"]
 
 
+def test_validate_runtime_env_builds_default_backend_fallbacks_when_unset(monkeypatch):
+    module = _load_validate_runtime_env_module()
+    monkeypatch.delenv("MUJOCO_GL", raising=False)
+
+    candidates = module.build_backend_candidates()
+
+    assert candidates == ["egl", "osmesa", "glfw", "auto"]
+
+
 def test_validate_runtime_env_falls_back_to_next_backend(monkeypatch):
     module = _load_validate_runtime_env_module()
     calls: list[str | None] = []

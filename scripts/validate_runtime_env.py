@@ -22,7 +22,7 @@ def build_backend_candidates() -> list[str]:
     explicit_backend = os.environ.get("MUJOCO_GL")
     if explicit_backend:
         return [explicit_backend]
-    return ["egl", "auto"]
+    return ["egl", "osmesa", "glfw", "auto"]
 
 
 def run_single_probe(backend: str) -> int:

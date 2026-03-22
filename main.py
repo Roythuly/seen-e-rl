@@ -23,6 +23,23 @@ ALGORITHM_BUILDERS = {
 }
 
 
+def _resolve_algorithm_name(config: dict[str, object]) -> str:
+    algo = config.get("algo")
+    if not isinstance(algo, dict):
+        raise ValueError("config must define algo.name")
+    algorithm_name = algo.get("name")
+    if not isinstance(algorithm_name, str) or not algorithm_name:
+        raise ValueError("config must define algo.name")
+    return algorithm_name
+
+
+def _resolve_algorithm_builder(algorithm_name: str):
+    builder = ALGORITHM_BUILDERS.get(algorithm_name)
+    if builder is None:
+        raise ValueError(f"unsupported algorithm: {algorithm_name}")
+    return builder
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Template-based RL training entrypoint.")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -46,8 +63,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     config = load_yaml(args.config)
-    algorithm_name = config["algo"]["name"]
-    builder = ALGORITHM_BUILDERS[algorithm_name]
+    try:
+        algorithm_name = _resolve_algorithm_name(config)
+        builder = _resolve_algorithm_builder(algorithm_name)
+    except ValueError as exc:
+        parser.error(str(exc))
     assembly = builder(config)
 
     if args.command == "train":

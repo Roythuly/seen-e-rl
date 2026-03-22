@@ -80,3 +80,39 @@ def test_main_cli_can_train_and_evaluate_small_config(tmp_path: Path):
     )
     assert evaluate.returncode == 0, evaluate.stdout + evaluate.stderr
     assert (artifacts_root / "eval_latest.json").exists()
+
+
+def test_main_cli_reports_missing_algo_name_as_config_error(tmp_path: Path):
+    config_path = _write_cli_config(tmp_path)
+    payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    payload.pop("algo")
+    config_path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+
+    result = subprocess.run(
+        [sys.executable, "main.py", "train", "--config", str(config_path)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 2
+    assert "algo.name" in result.stderr
+    assert "KeyError" not in result.stderr
+
+
+def test_main_cli_reports_unknown_algorithm_as_config_error(tmp_path: Path):
+    config_path = _write_cli_config(tmp_path)
+    payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    payload["algo"]["name"] = "unknown"
+    config_path.write_text(yaml.safe_dump(payload), encoding="utf-8")
+
+    result = subprocess.run(
+        [sys.executable, "main.py", "train", "--config", str(config_path)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 2
+    assert "unsupported algorithm" in result.stderr
+    assert "unknown" in result.stderr
