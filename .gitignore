@@ -8,3 +8,7 @@ build/
 wandb/
 *.pt
 *.pkl
+.venv/
+venv/
+env/
+.env
