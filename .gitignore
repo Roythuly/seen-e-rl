@@ -20,3 +20,4 @@ evals/reports/*
 .env
 .DS_Store
 .codex/
+AGENTS.md

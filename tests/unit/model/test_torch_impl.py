@@ -145,6 +145,27 @@ def test_torch_td3_model_returns_policy_online_q_and_target_smoothing_outputs():
     assert train_outputs["aux"]["target_policy_smoothing"]["smoothed_actions"].shape == (5, 2)
 
 
+def test_torch_td3_forward_act_is_deterministic_and_omits_log_prob():
+    torch.manual_seed(0)
+    model = TorchTD3Model(
+        encoder=MLPEncoder(input_dim=4, hidden_sizes=[8]),
+        actor=DeterministicActor(input_dim=8, action_dim=2),
+        critic=TwinQCritic(input_dim=8, action_dim=2),
+        target_encoder=MLPEncoder(input_dim=4, hidden_sizes=[8]),
+        target_actor=DeterministicActor(input_dim=8, action_dim=2),
+        target_critic=TwinQCritic(input_dim=8, action_dim=2),
+        policy_version=13,
+    )
+    observations = {"observations": torch.randn(5, 4)}
+
+    first = model.forward_act(observations)
+    second = model.forward_act(observations)
+
+    assert torch.allclose(first["action"], second["action"])
+    assert "log_prob" not in first
+    assert first["policy_version"] == 13
+
+
 def test_torch_model_requires_explicit_observation_keys() -> None:
     model = TorchPPOModel(
         encoder=MLPEncoder(input_dim=2, hidden_sizes=[4]),
