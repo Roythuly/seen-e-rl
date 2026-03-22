@@ -1,5 +1,5 @@
 from .base import BaseCollector, EnvAdapter
-from .impl import ReplayAssembler, ReplayCollector, TrajectoryAssembler, TrajectoryCollector
+from .impl import GymEnvFactory, ReplayAssembler, ReplayCollector, TorchActorHandle, TrajectoryAssembler, TrajectoryCollector
 from .templates import (
     ActorHandleTemplate,
     BatchAssemblerTemplate,
@@ -17,10 +17,12 @@ __all__ = [
     "EnvAdapter",
     "EnvAdapterTemplate",
     "EnvFactoryTemplate",
+    "GymEnvFactory",
     "ReplayAssembler",
     "ReplayCollector",
     "ReplayAssemblerTemplate",
     "RolloutWorkerTemplate",
+    "TorchActorHandle",
     "TrajectoryAssembler",
     "TrajectoryCollector",
     "TrajectoryAssemblerTemplate",

@@ -75,3 +75,26 @@ def build_eval_report(
         "status": "ok",
         "created_at": _timestamp(),
     }
+
+
+def build_update_result(
+    *,
+    run_id: str,
+    policy_version: int,
+    env_steps: int,
+    grad_steps: int,
+    status: str,
+    published_policy: bool,
+    metrics: dict[str, Any],
+    checkpoint_id: str | None = None,
+) -> dict[str, Any]:
+    return {
+        "run_id": run_id,
+        "policy_version": policy_version,
+        "checkpoint_id": checkpoint_id,
+        "env_steps": env_steps,
+        "grad_steps": grad_steps,
+        "status": status,
+        "published_policy": published_policy,
+        "metrics": metrics,
+    }

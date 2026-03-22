@@ -5,6 +5,8 @@ from copy import deepcopy
 import inspect
 from typing import Any
 
+import numpy as np
+
 
 def _copy_payload(value: Any) -> Any:
     return deepcopy(value)
@@ -65,6 +67,15 @@ class EnvAdapter:
         return unpack_reset_result(result)
 
     def step(self, env: Any, action: Any) -> tuple[Any, Any, bool, bool, dict[str, Any]]:
+        action_space = None
+        try:
+            action_space = env.action_space
+        except Exception:
+            action_space = None
+
+        if action_space is not None and hasattr(action_space, "low") and hasattr(action_space, "high"):
+            action = np.asarray(action, dtype=getattr(action_space, "dtype", None))
+            action = np.clip(action, action_space.low, action_space.high)
         result = env.step(action)
         return unpack_step_result(result)
 

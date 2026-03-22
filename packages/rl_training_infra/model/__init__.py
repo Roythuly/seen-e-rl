@@ -1,3 +1,4 @@
+from .factory import ModelFactory
 from .templates import ModelTemplate
 from .torch_impl import (
     DeterministicActor,
@@ -14,6 +15,7 @@ __all__ = [
     "DeterministicActor",
     "GaussianActor",
     "MLPEncoder",
+    "ModelFactory",
     "ModelTemplate",
     "TorchPPOModel",
     "TorchSACModel",

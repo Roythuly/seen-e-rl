@@ -1,14 +1,26 @@
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 import sys
-
 
 ROOT = Path(__file__).resolve().parent
 PACKAGES = ROOT / "packages"
 if str(PACKAGES) not in sys.path:
     sys.path.insert(0, str(PACKAGES))
+
+from algorithms.ppo import build_ppo_algorithm
+from algorithms.sac import build_sac_algorithm
+from algorithms.td3 import build_td3_algorithm
+from rl_training_infra.common import load_yaml
+
+
+ALGORITHM_BUILDERS = {
+    "ppo": build_ppo_algorithm,
+    "sac": build_sac_algorithm,
+    "td3": build_td3_algorithm,
+}
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -32,7 +44,20 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
-    parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    config = load_yaml(args.config)
+    algorithm_name = config["algo"]["name"]
+    builder = ALGORITHM_BUILDERS[algorithm_name]
+    assembly = builder(config)
+
+    if args.command == "train":
+        result = assembly.train()
+        print(json.dumps({"algorithm": algorithm_name, "env_steps": result["env_steps"], "updates": result["updates"]}))
+        return 0
+    if args.command == "evaluate":
+        report = assembly.evaluate(selector=args.selector)
+        print(json.dumps(report))
+        return 0
     return 0
 
 

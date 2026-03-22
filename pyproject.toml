@@ -9,7 +9,9 @@ description = "Docs-first RL research training infrastructure"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+  "gymnasium>=1.2",
   "jsonschema>=4.0",
+  "mujoco>=3.0",
   "numpy>=1.26",
   "PyYAML>=6.0",
   "torch>=2.1",

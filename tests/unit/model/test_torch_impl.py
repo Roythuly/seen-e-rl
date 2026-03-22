@@ -1,3 +1,5 @@
+from collections import OrderedDict
+
 import torch
 import pytest
 
@@ -11,6 +13,7 @@ from rl_training_infra.model import (
     TwinQCritic,
     ValueHead,
 )
+from rl_training_infra.model.base import batch_tensor_from_dict
 
 
 def test_mlp_encoder_projects_batches_to_final_hidden_size():
@@ -152,3 +155,18 @@ def test_torch_model_requires_explicit_observation_keys() -> None:
 
     with pytest.raises(KeyError, match="observations"):
         model.forward_act({"actions": torch.randn(3, 2)})
+
+
+def test_batch_tensor_from_dict_preserves_mapping_insertion_order() -> None:
+    payload = {
+        "observations": OrderedDict(
+            [
+                ("zeta", [1.0]),
+                ("alpha", [2.0, 3.0]),
+            ]
+        )
+    }
+
+    tensor = batch_tensor_from_dict(payload, "observations")
+
+    assert tensor.tolist() == [[1.0, 2.0, 3.0]]
