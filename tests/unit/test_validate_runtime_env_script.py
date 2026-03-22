@@ -1,4 +1,5 @@
 import importlib.util
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -14,11 +15,14 @@ def _load_validate_runtime_env_module():
 
 
 def test_validate_runtime_env_script_passes_for_local_runtime():
+    env = os.environ.copy()
+    env.pop("MUJOCO_GL", None)
     result = subprocess.run(
         [sys.executable, "scripts/validate_runtime_env.py"],
         check=False,
         capture_output=True,
         text=True,
+        env=env,
     )
 
     assert result.returncode == 0, result.stdout + result.stderr
