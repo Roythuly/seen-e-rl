@@ -18,7 +18,7 @@ def main():
 
     algo = config.algo.upper()
 
-    if algo in ("SAC", "TD3"):
+    if algo in ("SAC", "TD3", "OBAC"):
         from seenerl.trainers.off_policy import OffPolicyTrainer
         trainer = OffPolicyTrainer(config)
     elif algo == "PPO":

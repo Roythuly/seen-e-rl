@@ -5,6 +5,7 @@ A modular reinforcement learning framework built on PyTorch, supporting state-of
 - **SAC** (Soft Actor-Critic) — Off-policy, entropy-maximized
 - **TD3** (Twin Delayed DDPG) — Off-policy, deterministically exploring
 - **PPO** (Proximal Policy Optimization) — On-policy, clipped surrogate objective
+- **OBAC** (Offline-Boosted Actor-Critic) — Off-policy, adaptively blends historical behaviors
 
 ## Features
 
@@ -98,6 +99,19 @@ automatic_entropy_tuning: false
 ```
 
 Override any parameter via CLI dynamically: `--key value` or `--nested.key value`.
+
+## Citation
+
+If you use OBAC in your evaluations, please cite the following paper:
+
+```latex
+@inproceedings{Luo2024obac,
+  title={Offline-Boosted Actor-Critic: Adaptively Blending Optimal Historical Behaviors in Deep Off-Policy RL}, 
+  author={Yu Luo and Tianjing Ji and Fuchun Sun and Jianwei Zhang and Huazhe Xu and Xianyuan Zhan},
+  booktitle={International Conference on Machine Learning},
+  year={2024}
+}
+```
 
 ## License
 

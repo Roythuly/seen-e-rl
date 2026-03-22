@@ -1,0 +1,21 @@
+# ============================================================
+# seen-e-rl: OBAC Configuration
+# Inherits from default.yaml
+# ============================================================
+_base_: "default.yaml"
+
+algo: "OBAC"
+
+# --- OBAC-specific ---
+alpha: 0.2
+automatic_entropy_tuning: true
+tau: 0.005
+target_update_interval: 1
+quantile: 0.9
+bc_weight: 0.1
+
+# --- Off-policy ---
+replay_size: 1000000
+batch_size: 256
+start_steps: 10000
+updates_per_step: 1

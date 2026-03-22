@@ -15,6 +15,7 @@ import numpy as np
 from seenerl.algorithms.sac import SAC
 from seenerl.algorithms.td3 import TD3
 from seenerl.algorithms.ppo import PPO
+from seenerl.algorithms.obac import OBAC
 from seenerl.checkpoint import CheckpointManager
 from seenerl.config import load_config, Config
 
@@ -47,6 +48,8 @@ class Renderer:
             self.agent = TD3(obs_dim, self.env.action_space, self.config)
         elif algo == "PPO":
             self.agent = PPO(obs_dim, self.env.action_space, self.config)
+        elif algo == "OBAC":
+            self.agent = OBAC(obs_dim, self.env.action_space, self.config)
         else:
             raise ValueError(f"Unknown algorithm: {self.config.algo}")
 
