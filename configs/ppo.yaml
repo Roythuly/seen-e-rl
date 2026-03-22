@@ -1,0 +1,32 @@
+# ============================================================
+# seen-e-rl: PPO Configuration
+# Inherits from default.yaml
+# ============================================================
+_base_: "default.yaml"
+
+algo: "PPO"
+
+# --- PPO-specific ---
+clip_param: 0.2            # PPO clipping parameter ε
+ppo_epoch: 10              # Number of optimization epochs per rollout
+num_mini_batch: 32         # Number of mini-batches per epoch
+value_loss_coef: 0.5       # Value loss coefficient c1
+entropy_coef: 0.01         # Entropy bonus coefficient c2
+max_grad_norm: 0.5         # Gradient clipping
+gae_lambda: 0.95           # GAE lambda
+
+# --- On-policy ---
+rollout_steps: 2048        # Steps to collect per rollout
+lr: 0.0003
+gamma: 0.99
+
+# --- Network ---
+hidden_size: 256
+
+# --- Checkpoint (On-policy uses epoch-based) ---
+checkpoint:
+  strategies:
+    - "latest"
+    - "best"
+  interval_epochs: 50      # Save every 50 rollout cycles
+  save_buffer: false        # On-policy doesn't need buffer save

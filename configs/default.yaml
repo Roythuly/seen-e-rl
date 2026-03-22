@@ -1,0 +1,49 @@
+# ============================================================
+# seen-e-rl: Default Configuration
+# ============================================================
+# This file contains shared defaults for all algorithms.
+# Algorithm-specific YAML files inherit and override these.
+# CLI arguments take highest priority.
+# ============================================================
+
+# --- Environment ---
+env_name: "HalfCheetah-v4"
+seed: 42
+
+# --- Device ---
+device: "auto"       # "auto", "cpu", "cuda", "cuda:0", etc.
+
+# --- Training ---
+num_steps: 1000000   # Total training steps
+eval: true           # Whether to evaluate during training
+eval_interval: 10    # Evaluate every N episodes (off-policy) / N rollouts (on-policy)
+eval_episodes: 10    # Number of episodes per evaluation
+save: true           # Whether to save checkpoints
+
+# --- Network ---
+hidden_size: 256
+lr: 0.0003
+
+# --- General RL ---
+gamma: 0.99          # Discount factor
+
+# --- Checkpoint strategies ---
+checkpoint:
+  save_dir: "results"
+  strategies:
+    - "latest"       # Always keep the latest checkpoint
+    - "best"         # Save when eval reward is the best
+  interval_steps: null      # Save every N steps (null = disabled)
+  interval_epochs: null     # Save every N epochs (null = disabled)
+  save_buffer: true         # Save replay buffer for training resumption
+
+# --- Logger ---
+logger:
+  use_tensorboard: true
+  use_wandb: false
+  wandb_project: "seen-e-rl"
+  wandb_entity: null        # Your wandb username/team
+  log_interval: 1           # Log every N episodes
+
+# --- Tag ---
+tag: "default"

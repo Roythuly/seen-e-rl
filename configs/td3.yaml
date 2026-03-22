@@ -1,0 +1,19 @@
+# ============================================================
+# seen-e-rl: TD3 Configuration
+# Inherits from default.yaml
+# ============================================================
+_base_: "default.yaml"
+
+algo: "TD3"
+
+# --- TD3-specific ---
+tau: 0.005
+policy_noise: 0.2
+noise_clip: 0.5
+policy_freq: 2             # Delayed policy update frequency
+
+# --- Off-policy ---
+replay_size: 1000000
+batch_size: 256
+start_steps: 5000
+updates_per_step: 1

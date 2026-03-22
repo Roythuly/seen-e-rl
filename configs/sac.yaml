@@ -1,0 +1,20 @@
+# ============================================================
+# seen-e-rl: SAC Configuration
+# Inherits from default.yaml
+# ============================================================
+_base_: "default.yaml"
+
+algo: "SAC"
+
+# --- SAC-specific ---
+policy_type: "Gaussian"    # "Gaussian" | "Deterministic"
+alpha: 0.2                 # Temperature parameter
+automatic_entropy_tuning: false
+tau: 0.005                 # Target network soft update coefficient
+
+# --- Off-policy ---
+replay_size: 1000000
+batch_size: 256
+start_steps: 5000          # Random exploration steps
+updates_per_step: 1
+target_update_interval: 1

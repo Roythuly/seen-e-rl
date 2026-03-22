@@ -1,0 +1,29 @@
+[project]
+name = "seenerl"
+version = "0.1.0"
+description = "A modular reinforcement learning framework supporting SAC, TD3, PPO"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+
+dependencies = [
+    "torch>=2.0",
+    "gymnasium[mujoco]>=0.29",
+    "numpy>=1.24",
+    "pyyaml>=6.0",
+    "tensorboard>=2.14",
+]
+
+[project.optional-dependencies]
+wandb = ["wandb>=0.16"]
+dev = [
+    "pytest>=7.0",
+    "wandb>=0.16",
+]
+
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["seenerl*", "render*"]
