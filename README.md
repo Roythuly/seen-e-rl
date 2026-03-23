@@ -15,6 +15,7 @@ A modular reinforcement learning framework built on PyTorch for continuous contr
 - environment factory: a single batched interface for Gymnasium and Isaac Lab
 - parallel input support: Gym vector envs and Isaac Lab multi-env tasks share the same trainers
 - unified logging, evaluation, and checkpointing
+- automatic configuration persistence and inference from checkpoints for resume, evaluation, and rendering
 - improved PPO: per-mini-batch advantage normalization, value clipping, and dual-clip support aligned with tianshou
 - legacy compatibility for existing `env_name` / `hidden_size` configs
 
@@ -62,6 +63,12 @@ uv run train.py --config configs/sac.yaml --env_name HalfCheetah-v4
 uv run train.py --config configs/ppo.yaml --env_name Humanoid-v5
 ```
 
+Resuming automatically loads the saved configuration:
+
+```bash
+uv run train.py --resume results/Humanoid-v5/PPO/default/20260323_.../checkpoints/latest.pt
+```
+
 Parallel Gymnasium training uses the new nested env config:
 
 ```bash
@@ -88,17 +95,18 @@ The default Isaac Lab validation target is:
 
 ### Evaluation
 
+Configuration is now automatically loaded from your checkpoint's directory format:
+
 ```bash
-uv run evaluate.py --config configs/sac.yaml --checkpoint results/xxx/checkpoints/best.pt --num_episodes 10
-uv run evaluate.py --config configs/sac.yaml --env_name Ant-v5 --checkpoint results/Ant-v5/SAC/default/.../checkpoints/best.pt --num_episodes 10
-python evaluate.py --config configs/isaaclab_pickplace_ppo.yaml --checkpoint results/xxx/checkpoints/latest.pt --num_episodes 3
+uv run evaluate.py --checkpoint results/xxx/checkpoints/best.pt --num_episodes 10
+uv run evaluate.py --checkpoint results/Ant-v5/SAC/default/.../checkpoints/best.pt --num_episodes 10
 ```
 
 ### Rendering
 
 ```bash
-uv run render/renderer.py --config configs/sac.yaml --checkpoint results/xxx/checkpoints/best.pt --episodes 5
-uv run render/renderer.py --config configs/sac.yaml --env_name Ant-v5 --checkpoint results/Ant-v5/SAC/default/.../checkpoints/best.pt --episodes 5
+uv run render/renderer.py --checkpoint results/xxx/checkpoints/best.pt --episodes 5
+uv run render/renderer.py --checkpoint results/Ant-v5/SAC/default/.../checkpoints/best.pt --episodes 5
 ```
 
 ## Architecture
