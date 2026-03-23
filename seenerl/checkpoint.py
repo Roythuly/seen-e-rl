@@ -108,6 +108,10 @@ class CheckpointManager:
         Returns:
             Path to saved checkpoint.
         """
+        if eval_reward is not None:
+            if eval_reward > self.best_reward:
+                self.best_reward = eval_reward
+
         ckpt = {
             "agent_state_dict": agent.get_state_dict(),
             "step": step,
@@ -117,8 +121,6 @@ class CheckpointManager:
 
         if eval_reward is not None:
             ckpt["eval_reward"] = eval_reward
-            if eval_reward > self.best_reward:
-                self.best_reward = eval_reward
 
         ckpt_path = os.path.join(self.save_dir, f"{tag}.pt")
         torch.save(ckpt, ckpt_path)
@@ -165,7 +167,18 @@ class CheckpointManager:
             Dict with training state: step, epoch, best_reward.
         """
         ckpt = torch.load(path, map_location=agent.device)
-        agent.load_state_dict(ckpt["agent_state_dict"], evaluate=evaluate)
+        try:
+            agent.load_state_dict(ckpt["agent_state_dict"], evaluate=evaluate)
+        except RuntimeError as exc:
+            if "size mismatch" not in str(exc):
+                raise
+            raise RuntimeError(
+                "Checkpoint parameters do not match the current agent shape. "
+                "This usually means the checkpoint was trained with a different "
+                "environment, algorithm, or model config. Make sure your "
+                "--config and CLI overrides such as --env_name or --env.id "
+                f"match the training setup for '{path}'."
+            ) from exc
 
         # Try to load buffer
         if buffer is not None and hasattr(buffer, "load"):

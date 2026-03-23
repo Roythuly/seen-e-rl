@@ -1,10 +1,5 @@
-"""
-Soft Actor-Critic (SAC) algorithm implementation.
+"""Soft Actor-Critic (SAC) algorithm implementation."""
 
-Reference: Haarnoja et al., "Soft Actor-Critic Algorithms and Applications", 2018.
-"""
-
-import copy
 from typing import Any, Dict
 
 import numpy as np
@@ -13,10 +8,12 @@ import torch.nn.functional as F
 from torch.optim import Adam
 
 from seenerl.algorithms.base import BaseAlgorithm
-from seenerl.networks.mlp import GaussianActor, DeterministicActor, MLPCritic
-from seenerl.utils import soft_update, hard_update
+from seenerl.algorithms.registry import register_algorithm
+from seenerl.models import build_actor_model, build_q_critic_model
+from seenerl.utils import hard_update, resolve_device, soft_update
 
 
+@register_algorithm("SAC", trainer_kind="off_policy")
 class SAC(BaseAlgorithm):
     """
     Soft Actor-Critic with automatic entropy tuning.
@@ -31,10 +28,7 @@ class SAC(BaseAlgorithm):
             action_space: Gymnasium action space.
             config: Configuration object with SAC parameters.
         """
-        device = torch.device(config.device) if config.device != "auto" else (
-            torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        )
-        super().__init__(device)
+        super().__init__(resolve_device(config.device))
 
         self.gamma = config.gamma
         self.tau = config.tau
@@ -43,13 +37,19 @@ class SAC(BaseAlgorithm):
         self.target_update_interval = config.get("target_update_interval", 1)
         self.automatic_entropy_tuning = config.get("automatic_entropy_tuning", False)
 
-        action_dim = action_space.shape[0]
-        hidden_size = config.hidden_size
-
-        # Critic
-        self.critic = MLPCritic(obs_dim, action_dim, hidden_size).to(self.device)
+        self.critic = build_q_critic_model(
+            config,
+            obs_dim,
+            action_space,
+            default_name="q_network",
+        ).to(self.device)
         self.critic_optim = Adam(self.critic.parameters(), lr=config.lr)
-        self.critic_target = MLPCritic(obs_dim, action_dim, hidden_size).to(self.device)
+        self.critic_target = build_q_critic_model(
+            config,
+            obs_dim,
+            action_space,
+            default_name="q_network",
+        ).to(self.device)
         hard_update(self.critic_target, self.critic)
 
         # Policy
@@ -61,25 +61,31 @@ class SAC(BaseAlgorithm):
                 self.log_alpha = torch.zeros(1, requires_grad=True, device=self.device)
                 self.alpha_optim = Adam([self.log_alpha], lr=config.lr)
 
-            self.policy = GaussianActor(
-                obs_dim, action_dim, hidden_size, action_space
+            self.policy = build_actor_model(
+                config,
+                obs_dim,
+                action_space,
+                default_name="gaussian",
             ).to(self.device)
         else:
             self.alpha = 0
             self.automatic_entropy_tuning = False
-            self.policy = DeterministicActor(
-                obs_dim, action_dim, hidden_size, action_space
+            self.policy = build_actor_model(
+                config,
+                obs_dim,
+                action_space,
+                default_name="deterministic",
             ).to(self.device)
 
         self.policy_optim = Adam(self.policy.parameters(), lr=config.lr)
 
     def select_action(self, state: np.ndarray, evaluate: bool = False) -> np.ndarray:
-        state_t = torch.FloatTensor(state).to(self.device).unsqueeze(0)
+        state_t, single = self._prepare_state_tensor(state)
         if evaluate:
             _, _, action = self.policy.sample(state_t)
         else:
             action, _, _ = self.policy.sample(state_t)
-        return action.detach().cpu().numpy()[0]
+        return self._format_action_output(action, single)
 
     def update_parameters(self, memory, batch_size: int, updates: int) -> Dict[str, float]:
         """

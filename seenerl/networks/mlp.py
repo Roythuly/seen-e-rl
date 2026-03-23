@@ -22,10 +22,20 @@ class GaussianActor(BaseActor):
     and unsquashed distribution for PPO.
     """
 
-    def __init__(self, num_inputs: int, num_actions: int, hidden_dim: int = 256,
-                 action_space=None, squash: bool = True):
+    def __init__(
+        self,
+        num_inputs: int,
+        num_actions: int,
+        hidden_dim: int = 256,
+        action_space=None,
+        squash: bool = True,
+        unbounded: bool = True,
+        max_action: float = 1.0,
+    ):
         super().__init__()
         self.squash = squash
+        self._unbounded = unbounded
+        self.max_action = max_action
         self.linear1 = nn.Linear(num_inputs, hidden_dim)
         self.linear2 = nn.Linear(hidden_dim, hidden_dim)
         self.mean_linear = nn.Linear(hidden_dim, num_actions)
@@ -51,6 +61,8 @@ class GaussianActor(BaseActor):
         x = F.relu(self.linear1(state))
         x = F.relu(self.linear2(x))
         mean = self.mean_linear(x)
+        if not self._unbounded:
+            mean = self.max_action * torch.tanh(mean)
         log_std = self.log_std_linear(x)
         log_std = torch.clamp(log_std, min=LOG_SIG_MIN, max=LOG_SIG_MAX)
         return mean, log_std
@@ -128,7 +140,8 @@ class DeterministicActor(BaseActor):
         noise = self.noise.normal_(0.0, std=0.1)
         noise = noise.clamp(-0.25, 0.25)
         action = mean + noise
-        return action, torch.tensor(0.0), mean
+        log_prob = torch.zeros((state.shape[0], 1), dtype=state.dtype, device=state.device)
+        return action, log_prob, mean
 
     def to(self, device):
         self.action_scale = self.action_scale.to(device)

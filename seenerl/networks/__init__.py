@@ -7,6 +7,11 @@ from seenerl.networks.mlp import (
     MLPCritic,
     MLPValue,
 )
+from seenerl.networks.obac import (
+    OBACGaussianActor,
+    OBACQNetwork,
+    OBACValueNetwork,
+)
 from seenerl.networks.registry import (
     ACTOR_REGISTRY,
     CRITIC_REGISTRY,
@@ -23,6 +28,9 @@ __all__ = [
     "DeterministicActor",
     "MLPCritic",
     "MLPValue",
+    "OBACGaussianActor",
+    "OBACQNetwork",
+    "OBACValueNetwork",
     "ACTOR_REGISTRY",
     "CRITIC_REGISTRY",
     "register_actor",

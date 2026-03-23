@@ -8,7 +8,6 @@ via evaluate.py entry point.
 from typing import Dict, List
 
 import numpy as np
-import gymnasium as gym
 
 from seenerl.algorithms.base import BaseAlgorithm
 from seenerl.logger import TrainingLogger
@@ -21,7 +20,7 @@ class Evaluator:
     Returns statistics: avg_reward, std_reward, min_reward, max_reward.
     """
 
-    def __init__(self, env: gym.Env, agent: BaseAlgorithm,
+    def __init__(self, env, agent: BaseAlgorithm,
                  logger: TrainingLogger = None):
         """
         Args:
@@ -51,21 +50,13 @@ class Evaluator:
         for _ in range(num_episodes):
             state, _ = self.env.reset()
             episode_reward = 0.0
-            done = False
-            truncated = False
+            done = np.array([False], dtype=np.bool_)
+            truncated = np.array([False], dtype=np.bool_)
 
-            while not (done or truncated):
+            while not bool(done[0] or truncated[0]):
                 action = self.agent.select_action(state, evaluate=True)
-
-                if hasattr(self.env.action_space, "low") and hasattr(self.env.action_space, "high"):
-                    clipped_action = np.clip(
-                        action, self.env.action_space.low, self.env.action_space.high
-                    )
-                else:
-                    clipped_action = action
-
-                next_state, reward, done, truncated, info = self.env.step(clipped_action)
-                episode_reward += reward
+                next_state, reward, done, truncated, info = self.env.step(action)
+                episode_reward += float(np.asarray(reward).reshape(-1)[0])
                 state = next_state
 
             episode_rewards.append(episode_reward)

@@ -1,0 +1,19 @@
+_base_: "default.yaml"
+
+env:
+  backend: "isaaclab"
+  id: "Isaac-PickPlace-GR1T2-Abs-v0"
+  num_envs: 1
+  kwargs: {}
+  isaaclab:
+    headless: true
+    use_fabric: true
+    task_imports:
+      - "isaaclab_tasks.manager_based.manipulation.pick_place"
+
+device: "cuda:0"
+tag: "isaaclab_pickplace"
+eval: false
+logger:
+  use_tensorboard: true
+  use_wandb: false

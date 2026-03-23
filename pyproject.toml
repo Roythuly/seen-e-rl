@@ -27,3 +27,8 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 include = ["seenerl*", "render*"]
+
+[tool.pytest.ini_options]
+markers = [
+    "isaaclab: heavy Isaac Lab smoke tests that require a working Isaac Sim runtime",
+]

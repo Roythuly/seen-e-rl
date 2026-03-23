@@ -56,6 +56,34 @@ class ReplayBuffer:
         self.position = (self.position + 1) % self.capacity
         self.size = min(self.size + 1, self.capacity)
 
+    def add_batch(self, states: np.ndarray, actions: np.ndarray, rewards: np.ndarray,
+                  next_states: np.ndarray, dones: np.ndarray) -> None:
+        """Add a batch of transitions to the buffer."""
+        states = np.asarray(states, dtype=np.float32).reshape(-1, self.obs_dim)
+        actions = np.asarray(actions, dtype=np.float32).reshape(-1, self.action_dim)
+        rewards = np.asarray(rewards, dtype=np.float32).reshape(-1, 1)
+        next_states = np.asarray(next_states, dtype=np.float32).reshape(-1, self.obs_dim)
+        dones = np.asarray(dones, dtype=np.float32).reshape(-1, 1)
+
+        batch_size = states.shape[0]
+        if batch_size >= self.capacity:
+            states = states[-self.capacity:]
+            actions = actions[-self.capacity:]
+            rewards = rewards[-self.capacity:]
+            next_states = next_states[-self.capacity:]
+            dones = dones[-self.capacity:]
+            batch_size = self.capacity
+
+        indices = (np.arange(batch_size) + self.position) % self.capacity
+        self.states[indices] = states
+        self.actions[indices] = actions
+        self.rewards[indices] = rewards
+        self.next_states[indices] = next_states
+        self.dones[indices] = dones
+
+        self.position = (self.position + batch_size) % self.capacity
+        self.size = min(self.size + batch_size, self.capacity)
+
     def sample(self, batch_size: int) -> Tuple[np.ndarray, ...]:
         """
         Randomly sample a batch of transitions.

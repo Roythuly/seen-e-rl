@@ -1,9 +1,4 @@
-"""
-Twin Delayed Deep Deterministic Policy Gradient (TD3) algorithm.
-
-Reference: Fujimoto et al., "Addressing Function Approximation Error in
-Actor-Critic Methods", 2018.
-"""
+"""Twin Delayed Deep Deterministic Policy Gradient (TD3) algorithm."""
 
 import copy
 from typing import Any, Dict
@@ -14,21 +9,17 @@ import torch.nn.functional as F
 from torch.optim import Adam
 
 from seenerl.algorithms.base import BaseAlgorithm
-from seenerl.networks.mlp import DeterministicActor, MLPCritic
-from seenerl.utils import soft_update
+from seenerl.algorithms.registry import register_algorithm
+from seenerl.models import build_actor_model, build_q_critic_model
+from seenerl.utils import resolve_device, soft_update
 
 
+@register_algorithm("TD3", trainer_kind="off_policy")
 class TD3(BaseAlgorithm):
     """Twin Delayed DDPG with target policy smoothing and delayed updates."""
 
     def __init__(self, obs_dim: int, action_space, config):
-        device = torch.device(config.device) if config.device != "auto" else (
-            torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        )
-        super().__init__(device)
-
-        action_dim = action_space.shape[0]
-        hidden_size = config.hidden_size
+        super().__init__(resolve_device(config.device))
 
         self.tau = config.tau
         self.discount = config.gamma
@@ -39,27 +30,35 @@ class TD3(BaseAlgorithm):
         self.exploration_noise = config.get("exploration_noise", 0.1)
 
         # Networks
-        self.policy = DeterministicActor(
-            obs_dim, action_dim, hidden_size, action_space
+        self.policy = build_actor_model(
+            config,
+            obs_dim,
+            action_space,
+            default_name="deterministic",
         ).to(self.device)
         self.policy_target = copy.deepcopy(self.policy)
         self.policy_optim = Adam(self.policy.parameters(), lr=config.lr)
 
-        self.critic = MLPCritic(obs_dim, action_dim, hidden_size).to(self.device)
+        self.critic = build_q_critic_model(
+            config,
+            obs_dim,
+            action_space,
+            default_name="q_network",
+        ).to(self.device)
         self.critic_target = copy.deepcopy(self.critic)
         self.critic_optim = Adam(self.critic.parameters(), lr=config.lr)
 
         self._last_policy_loss = 0.0
 
     def select_action(self, state: np.ndarray, evaluate: bool = False) -> np.ndarray:
-        state_t = torch.FloatTensor(state).to(self.device).unsqueeze(0)
-        action = self.policy(state_t).detach().cpu().numpy()[0]
+        state_t, single = self._prepare_state_tensor(state)
+        action = self.policy(state_t).detach().cpu().numpy()
         
         if not evaluate:
             noise = np.random.normal(0, self.exploration_noise * self.max_action, size=action.shape)
             action = np.clip(action + noise, -self.max_action, self.max_action)
             
-        return action
+        return action[0] if single else action
 
     def update_parameters(self, memory, batch_size: int, updates: int) -> Dict[str, float]:
         """

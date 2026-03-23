@@ -1,8 +1,9 @@
 """Utility functions for RL training."""
 
-import torch
-import numpy as np
 import random
+
+import numpy as np
+import torch
 
 
 def soft_update(target: torch.nn.Module, source: torch.nn.Module, tau: float) -> None:
@@ -39,3 +40,31 @@ def resolve_device(device_str: str) -> torch.device:
     if device_str == "auto":
         return torch.device("cuda" if torch.cuda.is_available() else "cpu")
     return torch.device(device_str)
+
+
+def to_numpy(value) -> np.ndarray:
+    """Convert torch / numpy / scalar inputs to numpy arrays."""
+    if isinstance(value, np.ndarray):
+        return value
+    if isinstance(value, torch.Tensor):
+        return value.detach().cpu().numpy()
+    return np.asarray(value)
+
+
+def sample_batched_actions(action_space, num_envs: int) -> np.ndarray:
+    """Sample a batch of actions from a Gym action space."""
+    return np.stack([action_space.sample() for _ in range(num_envs)], axis=0).astype(np.float32)
+
+
+def resolve_buffer_next_states(next_states: np.ndarray, info: dict) -> np.ndarray:
+    """Use final observations when an autoreset wrapper exposes them."""
+    next_states = np.asarray(next_states, dtype=np.float32).copy()
+    final_mask = info.get("final_mask")
+    final_observation = info.get("final_observation")
+    if final_mask is None or final_observation is None:
+        return next_states
+
+    final_mask = np.asarray(final_mask, dtype=np.bool_)
+    final_observation = np.asarray(final_observation, dtype=np.float32)
+    next_states[final_mask] = final_observation[final_mask]
+    return next_states

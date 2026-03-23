@@ -3,7 +3,7 @@ Standalone evaluation entry point.
 
 Usage:
     python evaluate.py --checkpoint results/xxx/checkpoints/best.pt \\
-                       --config configs/sac.yaml \\
+                       --config configs/sac.yaml --env_name Ant-v5 \\
                        --num_episodes 10
 """
 
@@ -15,41 +15,30 @@ import sympy
 
 import argparse
 
-import gymnasium as gym
-
-from seenerl.algorithms.sac import SAC
-from seenerl.algorithms.td3 import TD3
-from seenerl.algorithms.ppo import PPO
+from seenerl.algorithms import build_algorithm
 from seenerl.checkpoint import CheckpointManager
 from seenerl.config import load_config
+from seenerl.envs import create_env
 from seenerl.evaluator import Evaluator
-from seenerl.logger import TrainingLogger
 
 
-def main():
+def parse_eval_args_and_load_config():
+    """Parse known CLI args and forward remaining overrides into the config loader."""
     parser = argparse.ArgumentParser(description="Evaluate a trained agent")
     parser.add_argument("--checkpoint", type=str, required=True, help="Path to checkpoint .pt file")
     parser.add_argument("--config", type=str, required=True, help="Path to YAML config file")
     parser.add_argument("--num_episodes", type=int, default=10, help="Number of eval episodes")
     parser.add_argument("--render", action="store_true", help="Render the environment")
-    args = parser.parse_args()
+    args, remaining = parser.parse_known_args()
+    config = load_config(args.config, remaining)
+    return args, config
 
-    config = load_config(args.config)
-    env_name = config.env_name
+
+def main():
+    args, config = parse_eval_args_and_load_config()
     render_mode = "human" if args.render else None
-    env = gym.make(env_name, render_mode=render_mode)
-
-    obs_dim = env.observation_space.shape[0]
-    algo = config.algo.upper()
-
-    if algo == "SAC":
-        agent = SAC(obs_dim, env.action_space, config)
-    elif algo == "TD3":
-        agent = TD3(obs_dim, env.action_space, config)
-    elif algo == "PPO":
-        agent = PPO(obs_dim, env.action_space, config)
-    else:
-        raise ValueError(f"Unknown algorithm: {config.algo}")
+    env = create_env(config, num_envs=1, render_mode=render_mode)
+    agent = build_algorithm(config, env.observation_space, env.action_space)
 
     # Load checkpoint
     CheckpointManager.load(args.checkpoint, agent, evaluate=True)
@@ -59,7 +48,7 @@ def main():
     result = evaluator.evaluate(num_episodes=args.num_episodes)
 
     print("=" * 60)
-    print(f"Environment: {env_name}")
+    print(f"Environment: {config.env.id}")
     print(f"Algorithm:   {config.algo}")
     print(f"Episodes:    {args.num_episodes}")
     print(f"Avg Reward:  {result['avg_reward']:.2f}")
