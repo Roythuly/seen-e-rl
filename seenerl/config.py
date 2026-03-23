@@ -233,19 +233,51 @@ def load_config(
     return Config(cfg)
 
 
+def save_config(config: Config, save_dir: str, filename: str = "config.yaml") -> str:
+    """Save the fully resolved configuration to a YAML file."""
+    os.makedirs(save_dir, exist_ok=True)
+    config_path = os.path.join(save_dir, filename)
+
+    def _to_dict(d: Any) -> Any:
+        if hasattr(d, "items"):
+            return {k: _to_dict(v) for k, v in d.items() if not k.startswith("_")}
+        if isinstance(d, list):
+            return [_to_dict(v) for v in d]
+        return deepcopy(d)
+
+    pure_dict = _to_dict(config)
+    pure_dict.pop("_base_", None)
+
+    with open(config_path, "w") as f:
+        yaml.dump(pure_dict, f, default_flow_style=False, sort_keys=False)
+    
+    return config_path
+
+
 def parse_args_and_load_config() -> Config:
     """
     Parse command line arguments and load config.
 
     Expected usage:
         python train.py --config configs/sac.yaml --env_name Humanoid-v5 --seed 42
-        python train.py --config configs/sac.yaml --resume path/to/checkpoint.pt
+        python train.py --resume path/to/checkpoint.pt
     """
     parser = argparse.ArgumentParser(description="seenerl training", add_help=False)
-    parser.add_argument("--config", type=str, required=True, help="Path to YAML config")
+    parser.add_argument("--config", type=str, required=False, help="Path to YAML config")
     parser.add_argument("--resume", type=str, default=None, help="Path to checkpoint for resuming")
 
     known_args, remaining = parser.parse_known_args()
+
+    if not known_args.config:
+        if known_args.resume:
+            checkpoint_dir = os.path.dirname(known_args.resume)
+            inferred_config_path = os.path.join(os.path.dirname(checkpoint_dir), "config.yaml")
+            if not os.path.exists(inferred_config_path):
+                raise ValueError(f"Could not find auto-inferred config at {inferred_config_path}.")
+            known_args.config = inferred_config_path
+        else:
+            parser.error("Either --config or --resume must be provided.")
+
     config = load_config(known_args.config, remaining)
 
     if known_args.resume:

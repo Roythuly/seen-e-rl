@@ -8,7 +8,7 @@ import numpy as np
 from seenerl.algorithms import build_algorithm
 from seenerl.buffers.replay_buffer import ReplayBuffer
 from seenerl.checkpoint import CheckpointManager
-from seenerl.config import Config
+from seenerl.config import Config, save_config
 from seenerl.envs import create_env
 from seenerl.evaluator import Evaluator
 from seenerl.logger import TrainingLogger
@@ -47,6 +47,7 @@ class OffPolicyTrainer:
             config.tag,
             f"{timestamp}_seed{config.seed}",
         )
+        save_config(config, self.result_dir)
 
         logger_cfg = config.get("logger", {})
         self.logger = TrainingLogger(

@@ -22,11 +22,19 @@ def parse_render_args_and_load_config():
     import argparse
 
     parser = argparse.ArgumentParser(description="Render a trained agent")
-    parser.add_argument("--config", type=str, required=True)
     parser.add_argument("--checkpoint", type=str, required=True)
+    parser.add_argument("--config", type=str, required=False)
     parser.add_argument("--episodes", type=int, default=5)
     parser.add_argument("--record_dir", type=str, default=None)
     args, remaining = parser.parse_known_args()
+
+    if not args.config:
+        checkpoint_dir = os.path.dirname(args.checkpoint)
+        inferred_config_path = os.path.join(os.path.dirname(checkpoint_dir), "config.yaml")
+        if not os.path.exists(inferred_config_path):
+            raise ValueError(f"Could not find auto-inferred config at {inferred_config_path}.")
+        args.config = inferred_config_path
+
     config = load_config(args.config, remaining)
     config["device"] = "cpu"
     return args, config

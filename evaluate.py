@@ -26,10 +26,18 @@ def parse_eval_args_and_load_config():
     """Parse known CLI args and forward remaining overrides into the config loader."""
     parser = argparse.ArgumentParser(description="Evaluate a trained agent")
     parser.add_argument("--checkpoint", type=str, required=True, help="Path to checkpoint .pt file")
-    parser.add_argument("--config", type=str, required=True, help="Path to YAML config file")
+    parser.add_argument("--config", type=str, required=False, help="Path to YAML config file")
     parser.add_argument("--num_episodes", type=int, default=10, help="Number of eval episodes")
     parser.add_argument("--render", action="store_true", help="Render the environment")
     args, remaining = parser.parse_known_args()
+
+    if not args.config:
+        checkpoint_dir = os.path.dirname(args.checkpoint)
+        inferred_config_path = os.path.join(os.path.dirname(checkpoint_dir), "config.yaml")
+        if not os.path.exists(inferred_config_path):
+            raise ValueError(f"Could not find auto-inferred config at {inferred_config_path}.")
+        args.config = inferred_config_path
+
     config = load_config(args.config, remaining)
     return args, config
 
