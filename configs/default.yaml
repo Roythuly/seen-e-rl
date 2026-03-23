@@ -14,7 +14,7 @@ seed: 42
 device: "auto"       # "auto", "cpu", "cuda", "cuda:0", etc.
 
 # --- Training ---
-num_steps: 1000000   # Total training steps
+num_steps: 100000000   # Total training steps
 eval: true           # Whether to evaluate during training
 eval_interval: 10    # Evaluate every N episodes (off-policy) / N rollouts (on-policy)
 eval_episodes: 10    # Number of episodes per evaluation
