@@ -14,6 +14,8 @@ value_loss_coef: 0.5       # Value loss coefficient c1
 entropy_coef: 0.01         # Entropy bonus coefficient c2
 max_grad_norm: 0.5         # Gradient clipping
 gae_lambda: 0.95           # GAE lambda
+action_scaling: true       # Map bounded policy actions from [-1, 1] to env bounds
+action_bound_method: "clip"  # "clip" | "tanh", applied before action scaling
 
 # --- On-policy ---
 rollout_steps: 2048        # Steps to collect per rollout

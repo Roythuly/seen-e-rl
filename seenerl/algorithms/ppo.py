@@ -1,7 +1,8 @@
 """Proximal Policy Optimization (PPO) algorithm implementation."""
 
-from typing import Any, Dict
+from typing import Any, Dict, Union
 
+import gymnasium as gym
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -38,14 +39,22 @@ class PPO(BaseAlgorithm):
         self.value_loss_coef = config.get("value_loss_coef", 0.5)
         self.entropy_coef = config.get("entropy_coef", 0.01)
         self.max_grad_norm = config.get("max_grad_norm", 0.5)
+        self.action_scaling = config.get("action_scaling", True)
+        self.action_bound_method = config.get("action_bound_method", "clip")
 
-        # Actor (Gaussian policy without tanh squashing for PPO)
+        if not isinstance(action_space, gym.spaces.Box):
+            raise TypeError(f"PPO only supports Box action spaces, got {type(action_space)!r}")
+        self.action_low = np.asarray(action_space.low, dtype=np.float32)
+        self.action_high = np.asarray(action_space.high, dtype=np.float32)
+
+        # Tianshou-style PPO uses a bounded mean in [-1, 1], then maps sampled
+        # raw actions into the environment action range at collection/eval time.
         self.actor = build_actor_model(
             config,
             obs_dim,
             action_space,
             default_name="gaussian",
-            default_kwargs={"squash": False},
+            default_kwargs={"squash": False, "unbounded": False, "max_action": 1.0},
         ).to(self.device)
         self.actor_optim = Adam(self.actor.parameters(), lr=config.lr)
 
@@ -59,27 +68,32 @@ class PPO(BaseAlgorithm):
 
     def select_action(self, state: np.ndarray, evaluate: bool = False):
         """
-        Select action and return (action, log_prob, value).
+        Select action and return mapped env action plus rollout statistics.
 
-        For PPO, we need log_prob and value during rollout collection.
+        During rollout collection, the policy samples a raw action, stores that
+        raw action and its log-probability for PPO updates, and separately maps
+        the action into the environment action range before stepping the env.
 
         Returns:
             If evaluate: action numpy array
-            Otherwise: (action, log_prob, value) tuple
+            Otherwise: (env_action, log_prob, value, raw_action) tuple
         """
         state_t, single = self._prepare_state_tensor(state)
 
         with torch.no_grad():
             if evaluate:
                 _, _, action = self.actor.sample(state_t)
-                return self._format_action_output(action, single)
+                mapped_action = self._map_action(action)
+                return mapped_action[0] if single else mapped_action
             else:
-                action, log_prob, _ = self.actor.sample(state_t)
+                raw_action, log_prob, _ = self.actor.sample(state_t)
                 value = self.value_net(state_t)
-                actions = self._format_action_output(action, single)
+                mapped_action = self._map_action(raw_action)
+                actions = mapped_action[0] if single else mapped_action
+                raw_actions = self._format_action_output(raw_action, single)
                 log_probs = self._format_scalar_output(log_prob, single)
                 values = self._format_scalar_output(value, single)
-                return actions, log_probs, values
+                return actions, log_probs, values, raw_actions
 
     def get_value(self, state: np.ndarray) -> float:
         """Estimate V(s) for the given state."""
@@ -87,6 +101,28 @@ class PPO(BaseAlgorithm):
         with torch.no_grad():
             value = self.value_net(state_t)
         return self._format_scalar_output(value, single)
+
+    def _map_action(self, action: Union[torch.Tensor, np.ndarray]) -> np.ndarray:
+        """Map raw policy actions into the environment action space."""
+        if isinstance(action, torch.Tensor):
+            action = action.detach().cpu().numpy()
+
+        mapped = np.asarray(action, dtype=np.float32)
+        if self.action_bound_method == "clip":
+            mapped = np.clip(mapped, -1.0, 1.0)
+        elif self.action_bound_method == "tanh":
+            mapped = np.tanh(mapped)
+        elif self.action_bound_method is not None:
+            raise ValueError(
+                f"Unsupported PPO action_bound_method: {self.action_bound_method!r}"
+            )
+
+        if self.action_scaling:
+            mapped = self.action_low + (self.action_high - self.action_low) * (
+                mapped + 1.0
+            ) / 2.0
+
+        return mapped.astype(np.float32)
 
     def update_parameters(self, rollout_buffer) -> Dict[str, float]:
         """

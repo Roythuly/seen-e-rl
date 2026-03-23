@@ -12,7 +12,7 @@ from seenerl.config import Config
 from seenerl.envs import create_env
 from seenerl.evaluator import Evaluator
 from seenerl.logger import TrainingLogger
-from seenerl.utils import set_seed
+from seenerl.utils import resolve_buffer_next_states, set_seed
 
 
 class OnPolicyTrainer:
@@ -83,34 +83,45 @@ class OnPolicyTrainer:
         self.ckpt_manager.best_reward = state["best_reward"]
         self.logger.log_info(f"Resumed from {checkpoint_path}, step={self.total_steps}")
 
-    def _collect_rollout(self) -> float:
+    def _collect_rollout(self):
         """Collect a batched rollout."""
         if self._state is None:
             self._state, _ = self.env.reset(seed=self.config.seed)
 
         num_envs = self.env.num_envs
         episode_return_log = []
+        rollout_reward_sum = 0.0
 
         for _ in range(self.config.rollout_steps):
-            action, log_prob, value = self.agent.select_action(self._state)
-            next_state, reward, terminated, truncated, _ = self.env.step(action)
+            action, log_prob, value, raw_action = self.agent.select_action(self._state)
+            next_state, reward, terminated, truncated, info = self.env.step(action)
 
             reward = np.asarray(reward, dtype=np.float32).reshape(num_envs)
-            done = np.asarray(terminated | truncated, dtype=np.bool_).reshape(num_envs)
+            terminated = np.asarray(terminated, dtype=np.bool_).reshape(num_envs)
+            truncated = np.asarray(truncated, dtype=np.bool_).reshape(num_envs)
+            done = terminated | truncated
             log_prob = np.asarray(log_prob, dtype=np.float32).reshape(num_envs)
             value = np.asarray(value, dtype=np.float32).reshape(num_envs)
+            buffer_next_state = resolve_buffer_next_states(next_state, info)
+            next_value = np.asarray(
+                self.agent.get_value(buffer_next_state),
+                dtype=np.float32,
+            ).reshape(num_envs)
 
             self.rollout_buffer.add(
                 state=self._state,
-                action=np.asarray(action, dtype=np.float32),
+                action=np.asarray(raw_action, dtype=np.float32),
                 reward=reward,
-                done=done.astype(np.float32),
+                terminated=terminated,
+                truncated=truncated,
                 log_prob=log_prob,
                 value=value,
+                next_value=next_value,
             )
 
             self.total_steps += num_envs
             self._episode_returns += reward
+            rollout_reward_sum += float(reward.sum())
 
             for env_index in np.flatnonzero(done):
                 self.completed_episodes += 1
@@ -119,16 +130,20 @@ class OnPolicyTrainer:
 
             self._state = next_state
 
-        last_value = self.agent.get_value(self._state)
         self.rollout_buffer.compute_returns_and_advantages(
-            last_value=np.asarray(last_value, dtype=np.float32),
             gamma=self.config.gamma,
             gae_lambda=self.config.gae_lambda,
         )
 
+        avg_episode_reward = None
         if episode_return_log:
-            return float(np.mean(episode_return_log))
-        return float(np.mean(self._episode_returns))
+            avg_episode_reward = float(np.mean(episode_return_log))
+
+        return {
+            "avg_episode_reward": avg_episode_reward,
+            "avg_step_reward": rollout_reward_sum / (self.config.rollout_steps * num_envs),
+            "completed_episodes": len(episode_return_log),
+        }
 
     def train(self) -> None:
         """Main on-policy training loop."""
@@ -140,18 +155,36 @@ class OnPolicyTrainer:
         while self.total_steps < self.config.num_steps:
             self.rollout_count += 1
 
-            avg_rollout_reward = self._collect_rollout()
+            rollout_metrics = self._collect_rollout()
             losses = self.agent.update_parameters(self.rollout_buffer)
             self.rollout_buffer.reset()
+
+            avg_episode_reward = rollout_metrics["avg_episode_reward"]
+            avg_step_reward = float(rollout_metrics["avg_step_reward"])
+            completed_episodes = int(rollout_metrics["completed_episodes"])
+            reward_metric = "episode_return"
+            logged_reward = avg_episode_reward
+            if logged_reward is None:
+                reward_metric = "step_reward"
+                logged_reward = avg_step_reward
 
             self.logger.log_train(
                 step=self.total_steps,
                 episode=self.rollout_count,
                 episode_steps=self.config.rollout_steps * self.env.num_envs,
-                reward=avg_rollout_reward,
+                reward=float(logged_reward),
+                reward_metric=reward_metric,
+                completed_episodes=completed_episodes,
                 **losses,
             )
-            self.logger.log_scalar("train/avg_reward", avg_rollout_reward, self.total_steps)
+            self.logger.log_scalar("train/avg_reward", float(logged_reward), self.total_steps)
+            self.logger.log_scalar("train/avg_step_reward", avg_step_reward, self.total_steps)
+            if avg_episode_reward is not None:
+                self.logger.log_scalar(
+                    "train/avg_episode_reward",
+                    float(avg_episode_reward),
+                    self.total_steps,
+                )
             self.logger.log_dict(losses, self.total_steps, prefix="loss")
 
             if self.config.eval and self.rollout_count % self.config.eval_interval == 0:

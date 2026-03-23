@@ -17,6 +17,21 @@ from seenerl.config import load_config
 from seenerl.envs import create_env
 
 
+def parse_render_args_and_load_config():
+    """Parse known CLI args and forward remaining overrides into the config loader."""
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Render a trained agent")
+    parser.add_argument("--config", type=str, required=True)
+    parser.add_argument("--checkpoint", type=str, required=True)
+    parser.add_argument("--episodes", type=int, default=5)
+    parser.add_argument("--record_dir", type=str, default=None)
+    args, remaining = parser.parse_known_args()
+    config = load_config(args.config, remaining)
+    config["device"] = "cpu"
+    return args, config
+
+
 class Renderer:
     """
     Renders a trained agent in its environment.
@@ -24,14 +39,13 @@ class Renderer:
     Supports human-mode rendering and video recording via gymnasium wrappers.
     """
 
-    def __init__(self, config_path: str, checkpoint_path: str):
+    def __init__(self, config, checkpoint_path: str):
         """
         Args:
-            config_path: Path to YAML config file.
+            config: Loaded config object.
             checkpoint_path: Path to checkpoint .pt file.
         """
-        self.config = load_config(config_path)
-        self.config["device"] = "cpu"
+        self.config = config
 
         render_mode = "human"
         self.env = create_env(self.config, num_envs=1, render_mode=render_mode)
@@ -72,14 +86,6 @@ class Renderer:
 
 
 if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser(description="Render a trained agent")
-    parser.add_argument("--config", type=str, required=True)
-    parser.add_argument("--checkpoint", type=str, required=True)
-    parser.add_argument("--episodes", type=int, default=5)
-    parser.add_argument("--record_dir", type=str, default=None)
-    args = parser.parse_args()
-
-    renderer = Renderer(args.config, args.checkpoint)
+    args, config = parse_render_args_and_load_config()
+    renderer = Renderer(config, args.checkpoint)
     renderer.run(num_episodes=args.episodes, record_dir=args.record_dir)

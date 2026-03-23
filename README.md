@@ -89,6 +89,7 @@ The default Isaac Lab validation target is:
 
 ```bash
 uv run evaluate.py --config configs/sac.yaml --checkpoint results/xxx/checkpoints/best.pt --num_episodes 10
+uv run evaluate.py --config configs/sac.yaml --env_name Ant-v5 --checkpoint results/Ant-v5/SAC/default/.../checkpoints/best.pt --num_episodes 10
 python evaluate.py --config configs/isaaclab_pickplace_ppo.yaml --checkpoint results/xxx/checkpoints/latest.pt --num_episodes 3
 ```
 
@@ -96,6 +97,7 @@ python evaluate.py --config configs/isaaclab_pickplace_ppo.yaml --checkpoint res
 
 ```bash
 uv run render/renderer.py --config configs/sac.yaml --checkpoint results/xxx/checkpoints/best.pt --episodes 5
+uv run render/renderer.py --config configs/sac.yaml --env_name Ant-v5 --checkpoint results/Ant-v5/SAC/default/.../checkpoints/best.pt --episodes 5
 ```
 
 ## Architecture

@@ -3,7 +3,7 @@ Standalone evaluation entry point.
 
 Usage:
     python evaluate.py --checkpoint results/xxx/checkpoints/best.pt \\
-                       --config configs/sac.yaml \\
+                       --config configs/sac.yaml --env_name Ant-v5 \\
                        --num_episodes 10
 """
 
@@ -22,15 +22,20 @@ from seenerl.envs import create_env
 from seenerl.evaluator import Evaluator
 
 
-def main():
+def parse_eval_args_and_load_config():
+    """Parse known CLI args and forward remaining overrides into the config loader."""
     parser = argparse.ArgumentParser(description="Evaluate a trained agent")
     parser.add_argument("--checkpoint", type=str, required=True, help="Path to checkpoint .pt file")
     parser.add_argument("--config", type=str, required=True, help="Path to YAML config file")
     parser.add_argument("--num_episodes", type=int, default=10, help="Number of eval episodes")
     parser.add_argument("--render", action="store_true", help="Render the environment")
-    args = parser.parse_args()
+    args, remaining = parser.parse_known_args()
+    config = load_config(args.config, remaining)
+    return args, config
 
-    config = load_config(args.config)
+
+def main():
+    args, config = parse_eval_args_and_load_config()
     render_mode = "human" if args.render else None
     env = create_env(config, num_envs=1, render_mode=render_mode)
     agent = build_algorithm(config, env.observation_space, env.action_space)
