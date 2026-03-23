@@ -1,10 +1,19 @@
-"""Proximal Policy Optimization (PPO) algorithm implementation."""
+"""Proximal Policy Optimization (PPO) algorithm implementation.
+
+Improvements over baseline PPO, aligned with tianshou v1.1.0:
+  - Per-mini-batch advantage normalization (not global)
+  - Value function clipping (arXiv:1811.02553v3)
+  - Dual-clip PPO (arXiv:1912.09729)
+  - Recompute advantage each epoch (arXiv:2006.05990)
+  - Default actor uses state-independent log_std with orthogonal init
+"""
 
 from typing import Any, Dict, Union
 
 import gymnasium as gym
 import numpy as np
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim import Adam
 
@@ -22,6 +31,13 @@ class PPO(BaseAlgorithm):
     On-policy algorithm: collects rollout_steps of data using the current
     policy, then performs ppo_epoch optimization epochs on the collected data,
     splitting it into num_mini_batch mini-batches per epoch.
+
+    Supports:
+      - Clipped surrogate objective (standard PPO)
+      - Value function clipping (prevents large value updates)
+      - Dual-clip PPO (extra clipping for negative advantages)
+      - Per-mini-batch advantage normalization
+      - Recompute advantage at each optimization epoch
     """
 
     def __init__(self, obs_dim: int, action_space, config):
@@ -42,18 +58,32 @@ class PPO(BaseAlgorithm):
         self.action_scaling = config.get("action_scaling", True)
         self.action_bound_method = config.get("action_bound_method", "clip")
 
+        # New PPO features (aligned with tianshou)
+        self.value_clip = config.get("value_clip", False)
+        self.dual_clip = config.get("dual_clip", None)
+        self.norm_adv = config.get("advantage_normalization", True)
+        self.recompute_advantage = config.get("recompute_advantage", False)
+
+        # GAE parameters (stored for recompute_advantage)
+        self._gamma = config.gamma
+        self._gae_lambda = config.gae_lambda
+
+        if self.dual_clip is not None:
+            assert self.dual_clip > 1.0, (
+                f"Dual-clip PPO parameter should be > 1.0, got {self.dual_clip}"
+            )
+
         if not isinstance(action_space, gym.spaces.Box):
             raise TypeError(f"PPO only supports Box action spaces, got {type(action_space)!r}")
         self.action_low = np.asarray(action_space.low, dtype=np.float32)
         self.action_high = np.asarray(action_space.high, dtype=np.float32)
 
-        # Tianshou-style PPO uses a bounded mean in [-1, 1], then maps sampled
-        # raw actions into the environment action range at collection/eval time.
+        # Actor: default to gaussian_fixed_std (PPO-specific, state-independent log_std)
         self.actor = build_actor_model(
             config,
             obs_dim,
             action_space,
-            default_name="gaussian",
+            default_name="gaussian_fixed_std",
             default_kwargs={"squash": False, "unbounded": False, "max_action": 1.0},
         ).to(self.device)
         self.actor_optim = Adam(self.actor.parameters(), lr=config.lr)
@@ -129,7 +159,13 @@ class PPO(BaseAlgorithm):
         Update PPO parameters from rollout buffer.
 
         Performs ppo_epoch optimization epochs, each splitting the rollout
-        data into num_mini_batch mini-batches.
+        data into num_mini_batch mini-batches per epoch.
+
+        Features:
+          - Per-mini-batch advantage normalization
+          - Value function clipping (if value_clip=True)
+          - Dual-clip PPO (if dual_clip is set)
+          - Recompute advantages each epoch (if recompute_advantage=True)
 
         Args:
             rollout_buffer: RolloutBuffer with computed advantages and returns.
@@ -143,9 +179,22 @@ class PPO(BaseAlgorithm):
         num_updates = 0
 
         for epoch in range(self.ppo_epoch):
+            # Recompute advantages each epoch (arXiv:2006.05990)
+            if self.recompute_advantage and epoch > 0:
+                rollout_buffer.compute_returns_and_advantages(
+                    gamma=self._gamma,
+                    gae_lambda=self._gae_lambda,
+                )
+
             for (
-                states, actions, old_log_probs, advantages, returns
+                states, actions, old_log_probs, advantages, returns, old_values
             ) in rollout_buffer.get_mini_batches(self.num_mini_batch, self.device):
+
+                # Per-mini-batch advantage normalization (tianshou standard)
+                if self.norm_adv:
+                    adv_mean = advantages.mean()
+                    adv_std = advantages.std()
+                    advantages = (advantages - adv_mean) / (adv_std + 1e-8)
 
                 # Evaluate actions under current policy
                 log_probs, entropy = self.actor.evaluate_actions(states, actions)
@@ -158,11 +207,27 @@ class PPO(BaseAlgorithm):
                 surr2 = torch.clamp(
                     ratio, 1.0 - self.clip_param, 1.0 + self.clip_param
                 ) * advantages
-                policy_loss = -torch.min(surr1, surr2).mean()
 
-                # Value loss
+                if self.dual_clip is not None:
+                    # Dual-clip PPO (arXiv:1912.09729)
+                    clip1 = torch.min(surr1, surr2)
+                    clip2 = torch.max(clip1, self.dual_clip * advantages)
+                    policy_loss = -torch.where(advantages < 0, clip2, clip1).mean()
+                else:
+                    policy_loss = -torch.min(surr1, surr2).mean()
+
+                # Value loss with optional clipping
                 values = self.value_net(states)
-                value_loss = F.mse_loss(values, returns)
+                if self.value_clip:
+                    # Value function clipping (arXiv:1811.02553v3)
+                    v_clip = old_values + (values - old_values).clamp(
+                        -self.clip_param, self.clip_param
+                    )
+                    vf1 = (returns - values).pow(2)
+                    vf2 = (returns - v_clip).pow(2)
+                    value_loss = torch.max(vf1, vf2).mean()
+                else:
+                    value_loss = F.mse_loss(values, returns)
 
                 # Entropy bonus
                 entropy_loss = -entropy.mean()
@@ -174,18 +239,19 @@ class PPO(BaseAlgorithm):
                     + self.entropy_coef * entropy_loss
                 )
 
-                # Update actor
+                # Update actor and critic
                 self.actor_optim.zero_grad()
                 self.value_optim.zero_grad()
                 loss.backward()
 
                 # Gradient clipping
-                torch.nn.utils.clip_grad_norm_(
-                    self.actor.parameters(), self.max_grad_norm
-                )
-                torch.nn.utils.clip_grad_norm_(
-                    self.value_net.parameters(), self.max_grad_norm
-                )
+                if self.max_grad_norm is not None:
+                    nn.utils.clip_grad_norm_(
+                        self.actor.parameters(), self.max_grad_norm
+                    )
+                    nn.utils.clip_grad_norm_(
+                        self.value_net.parameters(), self.max_grad_norm
+                    )
 
                 self.actor_optim.step()
                 self.value_optim.step()

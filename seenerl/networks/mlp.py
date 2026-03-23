@@ -101,6 +101,78 @@ class GaussianActor(BaseActor):
         return super().to(device)
 
 
+def _orthogonal_init_(m: nn.Module) -> None:
+    """Orthogonal initialization (standard for PPO networks)."""
+    if isinstance(m, nn.Linear):
+        nn.init.orthogonal_(m.weight, gain=nn.init.calculate_gain("relu"))
+        nn.init.constant_(m.bias, 0)
+
+
+@register_actor("gaussian_fixed_std")
+class GaussianFixedStdActor(BaseActor):
+    """
+    Gaussian policy with state-independent log_std for PPO.
+
+    Differences from GaussianActor:
+      - log_std is a learnable nn.Parameter (not state-dependent)
+      - Uses orthogonal initialization (standard for PPO)
+      - Always unsquashed, bounded mean via tanh (PPO convention)
+
+    The mean is bounded to [-max_action, max_action] via tanh, and the
+    raw sampled actions are mapped into the environment action range
+    by the PPO algorithm's _map_action method.
+    """
+
+    def __init__(
+        self,
+        num_inputs: int,
+        num_actions: int,
+        hidden_dim: int = 256,
+        action_space=None,
+        squash: bool = False,
+        unbounded: bool = False,
+        max_action: float = 1.0,
+    ):
+        super().__init__()
+        self.max_action = max_action
+        self.linear1 = nn.Linear(num_inputs, hidden_dim)
+        self.linear2 = nn.Linear(hidden_dim, hidden_dim)
+        self.mean_linear = nn.Linear(hidden_dim, num_actions)
+
+        # State-independent learnable log_std (PPO standard)
+        self.log_std = nn.Parameter(torch.zeros(num_actions))
+
+        # Orthogonal initialization for hidden layers
+        self.apply(_orthogonal_init_)
+        # Smaller init for output layer (policy head)
+        nn.init.orthogonal_(self.mean_linear.weight, gain=0.01)
+        nn.init.constant_(self.mean_linear.bias, 0)
+
+    def forward(self, state: torch.Tensor):
+        x = F.relu(self.linear1(state))
+        x = F.relu(self.linear2(x))
+        mean = self.max_action * torch.tanh(self.mean_linear(x))
+        log_std = self.log_std.expand_as(mean)
+        log_std = torch.clamp(log_std, min=LOG_SIG_MIN, max=LOG_SIG_MAX)
+        return mean, log_std
+
+    def sample(self, state: torch.Tensor):
+        mean, log_std = self.forward(state)
+        std = log_std.exp()
+        normal = Normal(mean, std)
+        action = normal.rsample()
+        log_prob = normal.log_prob(action).sum(1, keepdim=True)
+        return action, log_prob, mean
+
+    def evaluate_actions(self, state: torch.Tensor, action: torch.Tensor):
+        mean, log_std = self.forward(state)
+        std = log_std.exp()
+        normal = Normal(mean, std)
+        log_prob = normal.log_prob(action).sum(-1, keepdim=True)
+        entropy = normal.entropy().sum(-1, keepdim=True)
+        return log_prob, entropy
+
+
 @register_actor("deterministic")
 class DeterministicActor(BaseActor):
     """

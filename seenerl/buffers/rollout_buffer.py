@@ -121,23 +121,18 @@ class RolloutBuffer:
             device: Torch device to move tensors to.
 
         Yields:
-            (states, actions, old_log_probs, advantages, returns) tensors.
+            (states, actions, old_log_probs, advantages, returns, old_values) tensors.
         """
         batch_size = self.rollout_steps * self.num_envs
         mini_batch_size = max(batch_size // num_mini_batch, 1)
         indices = np.random.permutation(batch_size)
 
-        # Normalize advantages
-        adv = self.advantages.reshape(-1).copy()
-        adv_mean = adv.mean()
-        adv_std = adv.std() + 1e-8
-        adv = (adv - adv_mean) / adv_std
-
         states = self.states.reshape(batch_size, self.obs_dim)
         actions = self.actions.reshape(batch_size, self.action_dim)
         log_probs = self.log_probs.reshape(batch_size, 1)
         returns = self.returns.reshape(batch_size, 1)
-        advantages = adv.reshape(batch_size, 1)
+        advantages = self.advantages.reshape(batch_size, 1)
+        old_values = self.values.reshape(batch_size, 1)
 
         for start in range(0, batch_size, mini_batch_size):
             end = start + mini_batch_size
@@ -148,4 +143,6 @@ class RolloutBuffer:
                 torch.as_tensor(log_probs[idx], dtype=torch.float32, device=device),
                 torch.as_tensor(advantages[idx], dtype=torch.float32, device=device),
                 torch.as_tensor(returns[idx], dtype=torch.float32, device=device),
+                torch.as_tensor(old_values[idx], dtype=torch.float32, device=device),
             )
+

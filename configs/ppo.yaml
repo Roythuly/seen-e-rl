@@ -9,13 +9,19 @@ algo: "PPO"
 # --- PPO-specific ---
 clip_param: 0.2            # PPO clipping parameter ε
 ppo_epoch: 10              # Number of optimization epochs per rollout
-num_mini_batch: 32        # Number of mini-batches per epoch
+num_mini_batch: 32         # Number of mini-batches per epoch
 value_loss_coef: 0.5       # Value loss coefficient c1
 entropy_coef: 0.01         # Entropy bonus coefficient c2
 max_grad_norm: 0.5         # Gradient clipping
 gae_lambda: 0.95           # GAE lambda
 action_scaling: true       # Map bounded policy actions from [-1, 1] to env bounds
 action_bound_method: "clip"  # "clip" | "tanh", applied before action scaling
+
+# --- Advanced PPO (aligned with tianshou) ---
+value_clip: false           # Clip value function updates (arXiv:1811.02553v3)
+dual_clip: null             # Dual-clip parameter c > 1.0 (arXiv:1912.09729), null = disabled
+advantage_normalization: true  # Normalize advantages per mini-batch
+recompute_advantage: false  # Recompute advantages each epoch (arXiv:2006.05990)
 
 # --- On-policy ---
 rollout_steps: 2048        # Steps to collect per rollout
@@ -32,3 +38,4 @@ checkpoint:
     - "best"
   interval_epochs: 50      # Save every 50 rollout cycles
   save_buffer: false        # On-policy doesn't need buffer save
+

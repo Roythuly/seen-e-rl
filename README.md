@@ -11,11 +11,12 @@ A modular reinforcement learning framework built on PyTorch for continuous contr
 
 - YAML config loading with inheritance and CLI overrides
 - Algorithm registry: scripts and trainers no longer hardcode algorithm classes
-- Model factory: configurable actor / critic / value backbones through `model.*`
-- Environment factory: a single batched interface for Gymnasium and Isaac Lab
-- Parallel input support: Gym vector envs and Isaac Lab multi-env tasks share the same trainers
-- Unified logging, evaluation, and checkpointing
-- Legacy compatibility for existing `env_name` / `hidden_size` configs
+- model factory: configurable actor / critic / value backbones through `model.*`
+- environment factory: a single batched interface for Gymnasium and Isaac Lab
+- parallel input support: Gym vector envs and Isaac Lab multi-env tasks share the same trainers
+- unified logging, evaluation, and checkpointing
+- improved PPO: per-mini-batch advantage normalization, value clipping, and dual-clip support aligned with tianshou
+- legacy compatibility for existing `env_name` / `hidden_size` configs
 
 ## Installation
 

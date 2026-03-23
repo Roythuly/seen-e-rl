@@ -38,12 +38,14 @@ YAML 配置支持继承链（`_base_` 字段），CLI 参数优先级最高。
 
 **SAC**: Soft Actor-Critic，支持 Gaussian/Deterministic 策略，自动entropy调节  
 **TD3**: Twin Delayed DDPG，延迟策略更新 + 目标策略平滑  
-**PPO**: Proximal Policy Optimization，clipped surrogate + GAE
+**PPO**: Proximal Policy Optimization，clipped surrogate + GAE。增强特性：Per-mini-batch Advantage Normalization, Value Clipping, Dual-Clip, Recompute Advantage。  
+**OBAC**: Offline-Boosted Actor-Critic，结合在线与离线行为策略的 off-policy 算法。
 
 ### 2.3 网络模块 (`seenerl/networks/`)
 
 - `BaseActor` / `BaseCritic`: 抽象基类
-- `GaussianActor`: 高斯策略（SAC, PPO）
+- `GaussianActor`: 高斯策略（SAC）
+- `GaussianFixedStdActor`: 状态无关 log_std 的高斯策略（PPO 专属）
 - `DeterministicActor`: 确定性策略（TD3）
 - `MLPCritic`: 双Q网络
 - `MLPValue`: 状态价值网络（PPO）

@@ -46,12 +46,13 @@ def test_rollout_buffer_handles_batched_gae_and_minibatches():
 
     mini_batches = list(buffer.get_mini_batches(num_mini_batch=2, device=torch.device("cpu")))
     assert len(mini_batches) == 2
-    states, actions, log_probs, advantages, returns = mini_batches[0]
+    states, actions, log_probs, advantages, returns, old_values = mini_batches[0]
     assert states.shape[-1] == 3
     assert actions.shape[-1] == 2
     assert log_probs.shape[-1] == 1
     assert advantages.shape[-1] == 1
     assert returns.shape[-1] == 1
+    assert old_values.shape[-1] == 1
 
 
 def test_rollout_buffer_bootstraps_truncation_like_tianshou():
