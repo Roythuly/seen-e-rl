@@ -8,14 +8,14 @@ algo: "PPO"
 
 # --- PPO-specific ---
 clip_param: 0.2            # PPO clipping parameter ε
-ppo_epoch: 10              # Number of optimization epochs per rollout
-num_mini_batch: 32         # Number of mini-batches per epoch
+ppo_epoch: 4              # Number of optimization epochs per rollout
+num_mini_batch: 8         # Number of mini-batches per epoch
 value_loss_coef: 0.5       # Value loss coefficient c1
 entropy_coef: 0.01         # Entropy bonus coefficient c2
-max_grad_norm: 0.5         # Gradient clipping
+max_grad_norm: 1.0         # Gradient clipping
 gae_lambda: 0.95           # GAE lambda
 action_scaling: true       # Map bounded policy actions from [-1, 1] to env bounds
-action_bound_method: "clip"  # "clip" | "tanh", applied before action scaling
+action_bound_method: "tanh"  # "clip" | "tanh", applied before action scaling
 
 # --- Advanced PPO (aligned with tianshou) ---
 value_clip: false           # Clip value function updates (arXiv:1811.02553v3)
